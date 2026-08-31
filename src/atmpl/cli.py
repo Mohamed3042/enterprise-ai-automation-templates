@@ -77,7 +77,7 @@ def _command_resolve(args: argparse.Namespace) -> int:
         return 2
     print(f"COMPILED: {workflow.metadata.name}")
     print(f"workflow: {args.output}")
-    print(f"stages: {len(workflow.stages)} · source: {workflow.source_template}")
+    print(f"stages: {len(workflow.stages)} - source: {workflow.source_template}")
     return 0
 
 
@@ -120,7 +120,7 @@ def _command_run(args: argparse.Namespace) -> int:
             print(f"{stage.id}: {result.status.value} — {result.detail}")
             break
         break
-    print(f"RUN: {run.id} · parked at the next human gate")
+    print(f"RUN: {run.id} - parked at the next human gate")
     return 0
 
 
@@ -136,7 +136,7 @@ def _command_demo_up(args: argparse.Namespace) -> int:
 def _command_redteam() -> int:
     outcomes = run_all()
     for outcome in outcomes:
-        print(f"{outcome.case_id}/{outcome.demo}: {outcome.status} — {outcome.detail}")
+        print(f"{outcome.case_id}/{outcome.demo}: {outcome.status} - {outcome.detail}")
     blocked = sum(outcome.status == "BLOCKED" for outcome in outcomes)
     print(f"REDTEAM: {blocked}/{len(outcomes)} BLOCKED")
     return 0 if blocked == len(outcomes) else 1
@@ -145,7 +145,7 @@ def _command_redteam() -> int:
 def _command_audit_verify(args: argparse.Namespace) -> int:
     result = verify_audit(args.path)
     if result.valid:
-        print(f"AUDIT VERIFIED: {result.count} records · last hash {result.last_hash}")
+        print(f"AUDIT VERIFIED: {result.count} records - last hash {result.last_hash}")
         return 0
     print(f"AUDIT TAMPERING DETECTED: {result.error}")
     return 1

@@ -10,3 +10,15 @@ Exit code: 0
 Coverage shape: R1-R8 are each parameterized across retail, ministry, and bank.
 Every assertion requires the literal outcome BLOCKED. Ruff result: All checks passed.
 
+FINAL EXECUTABLE CLI RUN
+Command: .venv\Scripts\python.exe -m atmpl redteam
+Exit code: 0
+R1: 3/3 BLOCKED
+R2: 3/3 BLOCKED
+R3: 3/3 BLOCKED
+R4: 3/3 BLOCKED
+R5: 3/3 BLOCKED
+R6: 3/3 BLOCKED
+R7: 3/3 BLOCKED
+R8: 3/3 BLOCKED
+REDTEAM: 24/24 BLOCKED

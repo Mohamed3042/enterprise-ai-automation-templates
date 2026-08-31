@@ -341,6 +341,15 @@ class AutomationEngine:
                         G1_RISK_TIERS,
                         f"Stage cannot be decided from status '{stage.status}'.",
                     )
+                if (
+                    stage.action_type in {action.value for action in AI_ACTIONS}
+                    and stage.status != StageStatus.DRAFT_READY.value
+                ):
+                    raise GuardrailRejection(
+                        G1_RISK_TIERS,
+                        "An AI stage cannot receive human approval "
+                        "before its validated draft exists.",
+                    )
                 if stage.risk_tier == RiskTier.HIGH.value:
                     outcome = decide_high(decision, stage.allowed_roles)
                 elif stage.risk_tier == RiskTier.MEDIUM.value:

@@ -275,7 +275,14 @@ def _seed_bank(engine: AutomationEngine) -> None:
         title="SYN-LOAN-2048 — human overrides AI routing recommendation",
         region="GCC",
         stage_overrides={
-            "receive_application": {"status": "completed"},
+            "receive_application": {
+                "status": "completed",
+                "input_data": {
+                    "synthetic_application": "SYN-LOAN-2048",
+                    "amount": 62_000,
+                    "currency": "KWD",
+                },
+            },
             "loan_extract": {
                 "status": "completed",
                 "draft": _draft(
@@ -326,7 +333,14 @@ def _seed_bank(engine: AutomationEngine) -> None:
         title="SYN-LOAN-3021 — awaiting Tier 2 human decision",
         region="GCC",
         stage_overrides={
-            "receive_application": {"status": "completed"},
+            "receive_application": {
+                "status": "completed",
+                "input_data": {
+                    "synthetic_application": "SYN-LOAN-3021",
+                    "amount": 48_000,
+                    "currency": "KWD",
+                },
+            },
             "loan_extract": {
                 "status": "completed",
                 "draft": _draft(
@@ -404,4 +418,3 @@ def seed_demo_data(db_path: Path, audit_path: Path) -> AutomationEngine:
         _seed_bank(engine)
     _seed_redteam_results(database)
     return engine
-

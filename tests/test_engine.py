@@ -55,6 +55,26 @@ def test_prompt_injection_blocks_and_escalates_run(seeded_engine):
     assert result.guardrail == "G3"
 
 
+def test_medium_ai_stage_cannot_be_approved_before_a_draft_exists(seeded_engine):
+    run = seeded_engine.start_run(
+        workflow_id="wf_bank_triage",
+        run_id="run_engine_no_draft_test",
+        title="Synthetic no-draft approval test",
+        region="GCC",
+    )
+
+    try:
+        seeded_engine.submit_human_decision(
+            run.id,
+            "loan_extract",
+            signed("credit_analyst"),
+        )
+    except GuardrailRejection as exc:
+        assert "before its validated draft exists" in str(exc)
+    else:
+        raise AssertionError("MEDIUM AI stage was approved without a draft")
+
+
 def test_role_escalation_is_rejected_and_audited(seeded_engine):
     try:
         seeded_engine.submit_human_decision(
@@ -97,4 +117,3 @@ def test_kill_switch_parks_ai_but_human_gate_still_functions(seeded_engine):
         signed("regional_refund_manager"),
     )
     assert result.status == StageStatus.COMPLETED
-

@@ -16,6 +16,9 @@ def test_dashboard_pages_render_live_seeded_data(client):
         response = client.get(path)
         assert response.status_code == 200
         assert expected in response.text
+    override = client.get("/runs/run_bank_override")
+    assert "ROUTE_TO_TIER_2" in override.text
+    assert "Human terminal decision" in override.text
 
 
 def test_high_api_bypass_returns_4xx_and_audits(client, seeded_engine):
@@ -57,4 +60,3 @@ def test_inline_arabic_uses_direction_auto(client):
 
     assert 'dir="auto"' in response.text
     assert "المعلمة التجريبية أمل" in response.text
-

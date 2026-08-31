@@ -114,7 +114,9 @@ def create_app(engine: AutomationEngine) -> FastAPI:
                 (
                     stage.draft.get("content", {}).get("recommendation")
                     for stage in run.stages
-                    if stage.draft and stage.draft.get("content", {}).get("recommendation")
+                    if stage.stage_key == "credit_summary"
+                    and stage.draft
+                    and stage.draft.get("content", {}).get("recommendation")
                 ),
                 None,
             )
@@ -259,4 +261,3 @@ def create_app(engine: AutomationEngine) -> FastAPI:
         )
 
     return app
-

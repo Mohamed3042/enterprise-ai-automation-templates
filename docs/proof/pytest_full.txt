@@ -1,0 +1,26 @@
+FULL PYTEST RUN
+Date: 2026-08-31
+Python: 3.12.10
+Command: .venv\Scripts\python.exe -m pytest
+Exit code: 0
+
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0
+rootdir: C:\Users\GAMING\Downloads\enterprise-ai-automation-templates
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.14.2, cov-6.3.0
+collected 71 items
+
+tests\test_adapters.py ...                                               [  4%]
+tests\test_audit.py ...                                                  [  8%]
+tests\test_catalog_and_discovery.py .............                        [ 26%]
+tests\test_cli.py ..                                                     [ 29%]
+tests\test_demos.py ....                                                 [ 35%]
+tests\test_documentation_and_proof.py .......                            [ 45%]
+tests\test_engine.py .....                                               [ 52%]
+tests\test_guardrails.py ......                                          [ 60%]
+tests\test_redteam.py ........................                           [ 94%]
+tests\test_web.py ....                                                   [100%]
+
+============================= 71 passed in 6.56s ==============================
