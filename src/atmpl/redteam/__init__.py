@@ -1,0 +1,2 @@
+"""Executable red-team contracts."""
+

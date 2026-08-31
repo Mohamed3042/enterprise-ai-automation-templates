@@ -1,0 +1,39 @@
+RED-BEFORE GUARDRAIL CONTRACT RUN
+Date: 2026-08-31
+Python: 3.12.10
+Command: .venv\\Scripts\\python.exe -m pytest --tb=line -q
+Exit code: 1
+
+FFFFFFFFFFFFFFFFFFFFFFFF                                                 [100%]
+================================== FAILURES ===================================
+NotImplementedError: R1 guardrail is not wired for retail
+NotImplementedError: R1 guardrail is not wired for ministry
+NotImplementedError: R1 guardrail is not wired for bank
+NotImplementedError: R2 guardrail is not wired for retail
+NotImplementedError: R2 guardrail is not wired for ministry
+NotImplementedError: R2 guardrail is not wired for bank
+NotImplementedError: R3 guardrail is not wired for retail
+NotImplementedError: R3 guardrail is not wired for ministry
+NotImplementedError: R3 guardrail is not wired for bank
+NotImplementedError: R4 guardrail is not wired for retail
+NotImplementedError: R4 guardrail is not wired for ministry
+NotImplementedError: R4 guardrail is not wired for bank
+NotImplementedError: R5 guardrail is not wired for retail
+NotImplementedError: R5 guardrail is not wired for ministry
+NotImplementedError: R5 guardrail is not wired for bank
+NotImplementedError: R6 guardrail is not wired for retail
+NotImplementedError: R6 guardrail is not wired for ministry
+NotImplementedError: R6 guardrail is not wired for bank
+NotImplementedError: R7 guardrail is not wired for retail
+NotImplementedError: R7 guardrail is not wired for ministry
+NotImplementedError: R7 guardrail is not wired for bank
+NotImplementedError: R8 guardrail is not wired for retail
+NotImplementedError: R8 guardrail is not wired for ministry
+NotImplementedError: R8 guardrail is not wired for bank
+=========================== short test summary info ===========================
+24 failed in 0.07s
+
+Interpretation: the adversarial acceptance tests existed before any guardrail
+implementation and all 24 contracts failed. The baseline uses NotImplementedError;
+it does not introduce an insecure HIGH-risk auto-approval path.
+
