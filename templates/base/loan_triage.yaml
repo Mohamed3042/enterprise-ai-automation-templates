@@ -1,0 +1,83 @@
+metadata:
+  id: loan_triage
+  name: "{{organization.name}} — human-authority loan triage"
+  version: "1.0.0"
+  sector: banking
+  description: "AI extracts and recommends; a signed human owns every terminal credit decision."
+actors:
+  - role: credit_analyst
+    responsibility: Validate extracted synthetic application facts.
+  - role: "{{credit.terminal_decision_role}}"
+    responsibility: Own every terminal approve or reject decision.
+  - role: risk_owner
+    responsibility: Own escalations and the organization kill switch.
+stages:
+  - id: receive_application
+    name: Receive synthetic application
+    action_type: system_action
+    risk_tier: LOW
+    inputs:
+      maximum_amount: "{{credit.maximum_application_amount}}"
+    outputs:
+      required: []
+    escalation_rules: [amount_out_of_scope]
+    sla_hours: 1
+    audit_tags: [bank, intake, synthetic]
+    approval_roles: []
+  - id: loan_extract
+    name: Extract application facts as a draft
+    action_type: ai_extract
+    risk_tier: MEDIUM
+    inputs:
+      data_sensitivity: "{{organization.data_sensitivity}}"
+      allowed_actions: [extract_application]
+    outputs:
+      required: [summary, recommendation, completeness_score, risk_flags]
+      numeric_bounds:
+        completeness_score: [0, 100]
+    escalation_rules: [schema_failure, suspected_prompt_injection, cross_customer_content]
+    sla_hours: 2
+    audit_tags: [bank, ai_extract, draft_only]
+    approval_roles: [credit_analyst]
+  - id: credit_summary
+    name: Draft triage recommendation for human review
+    action_type: ai_draft
+    risk_tier: HIGH
+    inputs:
+      threshold: "{{credit.completeness_threshold}}"
+      authority_bands: "{{credit.authority_bands}}"
+      allowed_actions: [summarize_application]
+    outputs:
+      required: [summary, recommendation, completeness_score, risk_flags]
+      numeric_bounds:
+        completeness_score: [0, 100]
+    escalation_rules: [risk_flag_requires_senior_officer, output_policy_violation]
+    sla_hours: 4
+    audit_tags: [bank, high_risk, ai_recommendation_only]
+    approval_roles: ["{{credit.terminal_decision_role}}"]
+  - id: terminal_decision
+    name: Human terminal credit decision
+    action_type: human_approve
+    risk_tier: HIGH
+    inputs:
+      authority_bands: "{{credit.authority_bands}}"
+      authority_matrix: "{{governance.approval_authority_matrix}}"
+    outputs:
+      required: [decision, reason, signature]
+    escalation_rules: [role_outside_amount_band, missing_reason]
+    sla_hours: 12
+    audit_tags: [bank, high_risk, human_decision, terminal]
+    approval_roles: ["{{credit.terminal_decision_role}}"]
+  - id: notify_applicant
+    name: Notify synthetic applicant
+    action_type: notify
+    risk_tier: LOW
+    inputs:
+      locales: "{{organization.locales}}"
+    outputs:
+      required: []
+    escalation_rules: [delivery_failure]
+    sla_hours: 2
+    audit_tags: [bank, notification]
+    approval_roles: []
+

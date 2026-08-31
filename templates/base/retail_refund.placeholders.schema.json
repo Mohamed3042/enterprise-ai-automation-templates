@@ -1,0 +1,168 @@
+{
+  "$defs": {
+    "DataSensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted"
+      ],
+      "title": "DataSensitivity",
+      "type": "string"
+    },
+    "GovernancePlaceholders": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_authority_matrix": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "minProperties": 1,
+          "question": "Which named roles may approve each consequential decision or amount band?",
+          "title": "Approval Authority Matrix",
+          "type": "object"
+        },
+        "risk_appetite": {
+          "$ref": "#/$defs/RiskAppetite",
+          "question": "Is the agreed operating risk appetite conservative or balanced?"
+        },
+        "escalation_owner": {
+          "minLength": 2,
+          "question": "Which role receives blocked or out-of-policy cases?",
+          "title": "Escalation Owner",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approval_authority_matrix",
+        "risk_appetite",
+        "escalation_owner"
+      ],
+      "title": "GovernancePlaceholders",
+      "type": "object"
+    },
+    "OrganizationPlaceholders": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 2,
+          "question": "What organization name should appear in the workflow?",
+          "title": "Name",
+          "type": "string"
+        },
+        "process_owner": {
+          "minLength": 2,
+          "question": "Who owns the process and its operating outcome?",
+          "title": "Process Owner",
+          "type": "string"
+        },
+        "monthly_volume": {
+          "maximum": 10000000,
+          "minimum": 1,
+          "question": "How many cases does this process handle per month?",
+          "title": "Monthly Volume",
+          "type": "integer"
+        },
+        "data_sensitivity": {
+          "$ref": "#/$defs/DataSensitivity",
+          "question": "What is the highest data-sensitivity level in scope?"
+        },
+        "locales": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "question": "Which locale codes must the workflow support?",
+          "title": "Locales",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "process_owner",
+        "monthly_volume",
+        "data_sensitivity",
+        "locales"
+      ],
+      "title": "OrganizationPlaceholders",
+      "type": "object"
+    },
+    "RetailRegionalPlaceholders": {
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "enum": [
+            "EU",
+            "US",
+            "GCC"
+          ],
+          "question": "Which regional policy boundary applies: EU, US, or GCC?",
+          "title": "Region",
+          "type": "string"
+        },
+        "policy_pack": {
+          "enum": [
+            "eu_gdpr_14_day",
+            "us_standard",
+            "gcc_consumer"
+          ],
+          "question": "Which approved regional policy pack must be enforced?",
+          "title": "Policy Pack",
+          "type": "string"
+        },
+        "refund_limit": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000,
+          "question": "What is the maximum refund value in local currency?",
+          "title": "Refund Limit",
+          "type": "number"
+        },
+        "currency": {
+          "enum": [
+            "EUR",
+            "USD",
+            "KWD"
+          ],
+          "question": "Which currency is used for this regional workflow?",
+          "title": "Currency",
+          "type": "string"
+        }
+      },
+      "required": [
+        "region",
+        "policy_pack",
+        "refund_limit",
+        "currency"
+      ],
+      "title": "RetailRegionalPlaceholders",
+      "type": "object"
+    },
+    "RiskAppetite": {
+      "enum": [
+        "conservative",
+        "balanced"
+      ],
+      "title": "RiskAppetite",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "organization": {
+      "$ref": "#/$defs/OrganizationPlaceholders"
+    },
+    "governance": {
+      "$ref": "#/$defs/GovernancePlaceholders"
+    },
+    "regional": {
+      "$ref": "#/$defs/RetailRegionalPlaceholders"
+    }
+  },
+  "required": [
+    "organization",
+    "governance",
+    "regional"
+  ],
+  "title": "RetailPlaceholders",
+  "type": "object"
+}

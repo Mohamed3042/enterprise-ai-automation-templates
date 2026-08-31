@@ -1,0 +1,12 @@
+GREEN-AFTER GUARDRAIL CONTRACT RUN
+Date: 2026-08-31
+Python: 3.12.10
+Command: .venv\\Scripts\\python.exe -m pytest --tb=line -q
+Exit code: 0
+
+........................                                                 [100%]
+24 passed in 0.39s
+
+Coverage shape: R1-R8 are each parameterized across retail, ministry, and bank.
+Every assertion requires the literal outcome BLOCKED. Ruff result: All checks passed.
+

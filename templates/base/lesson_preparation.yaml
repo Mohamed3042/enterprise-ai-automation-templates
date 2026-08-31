@@ -1,0 +1,81 @@
+metadata:
+  id: lesson_preparation
+  name: "{{organization.name}} — lesson preparation governance"
+  version: "1.0.0"
+  sector: public_education
+  description: "Bilingual lesson enrichment, department approval, QA, and controlled publishing."
+actors:
+  - role: teacher
+    responsibility: Submit a synthetic bilingual lesson plan.
+  - role: "{{curriculum.department_head_role}}"
+    responsibility: Own curriculum-alignment approval.
+  - role: "{{curriculum.qa_role}}"
+    responsibility: Own the quality gate before publishing.
+  - role: risk_owner
+    responsibility: Own escalations and the organization kill switch.
+stages:
+  - id: submit_lesson
+    name: Teacher submits lesson plan
+    action_type: system_action
+    risk_tier: LOW
+    inputs:
+      locales: "{{organization.locales}}"
+    outputs:
+      required: []
+    escalation_rules: [missing_learning_objectives]
+    sla_hours: 2
+    audit_tags: [ministry, lesson, synthetic]
+    approval_roles: []
+  - id: enrich_lesson
+    name: AI curriculum enrichment draft
+    action_type: ai_draft
+    risk_tier: MEDIUM
+    inputs:
+      framework: "{{curriculum.framework}}"
+      data_sensitivity: "{{organization.data_sensitivity}}"
+      allowed_actions: [enrich_lesson]
+    outputs:
+      required: [summary, recommendation, alignment_score, bilingual]
+      numeric_bounds:
+        alignment_score: [0, 100]
+    escalation_rules: [curriculum_mismatch, suspected_prompt_injection]
+    sla_hours: 4
+    audit_tags: [ministry, ai_draft, curriculum]
+    approval_roles: ["{{curriculum.department_head_role}}"]
+  - id: department_approval
+    name: Department-head approval
+    action_type: human_approve
+    risk_tier: HIGH
+    inputs:
+      authority_matrix: "{{governance.approval_authority_matrix}}"
+    outputs:
+      required: [decision, reason, signature]
+    escalation_rules: [role_outside_authority_matrix]
+    sla_hours: 12
+    audit_tags: [ministry, high_risk, human_decision]
+    approval_roles: ["{{curriculum.department_head_role}}"]
+  - id: qa_gate
+    name: Quality assurance gate
+    action_type: human_review
+    risk_tier: MEDIUM
+    inputs:
+      framework: "{{curriculum.framework}}"
+    outputs:
+      required: [decision, reason]
+    escalation_rules: [quality_exception]
+    sla_hours: 8
+    audit_tags: [ministry, qa, human_review]
+    approval_roles: ["{{curriculum.qa_role}}"]
+  - id: publish_lesson
+    name: Publish approved lesson
+    action_type: system_action
+    risk_tier: LOW
+    inputs:
+      channel: "{{curriculum.publish_channel}}"
+    outputs:
+      required: []
+    escalation_rules: [publish_channel_unavailable]
+    sla_hours: 2
+    audit_tags: [ministry, publish]
+    approval_roles: []
+

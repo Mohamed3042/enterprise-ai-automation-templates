@@ -4,7 +4,6 @@ import pytest
 
 from atmpl.redteam.contracts import CASES
 
-
 DEMOS = ("retail", "ministry", "bank")
 CASE_IDS = tuple(case_id for case_id, _ in CASES)
 

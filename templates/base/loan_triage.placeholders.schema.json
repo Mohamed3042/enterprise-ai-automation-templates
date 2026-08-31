@@ -1,0 +1,160 @@
+{
+  "$defs": {
+    "CreditPlaceholders": {
+      "additionalProperties": false,
+      "properties": {
+        "authority_bands": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "minProperties": 1,
+          "question": "Which amount bands map to which credit-officer tiers?",
+          "title": "Authority Bands",
+          "type": "object"
+        },
+        "maximum_application_amount": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000000,
+          "question": "What is the maximum application amount in scope?",
+          "title": "Maximum Application Amount",
+          "type": "number"
+        },
+        "completeness_threshold": {
+          "maximum": 100,
+          "minimum": 1,
+          "question": "What completeness score is required before human triage?",
+          "title": "Completeness Threshold",
+          "type": "integer"
+        },
+        "terminal_decision_role": {
+          "minLength": 2,
+          "question": "Which human role owns every terminal credit decision?",
+          "title": "Terminal Decision Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "authority_bands",
+        "maximum_application_amount",
+        "completeness_threshold",
+        "terminal_decision_role"
+      ],
+      "title": "CreditPlaceholders",
+      "type": "object"
+    },
+    "DataSensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted"
+      ],
+      "title": "DataSensitivity",
+      "type": "string"
+    },
+    "GovernancePlaceholders": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_authority_matrix": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "minProperties": 1,
+          "question": "Which named roles may approve each consequential decision or amount band?",
+          "title": "Approval Authority Matrix",
+          "type": "object"
+        },
+        "risk_appetite": {
+          "$ref": "#/$defs/RiskAppetite",
+          "question": "Is the agreed operating risk appetite conservative or balanced?"
+        },
+        "escalation_owner": {
+          "minLength": 2,
+          "question": "Which role receives blocked or out-of-policy cases?",
+          "title": "Escalation Owner",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approval_authority_matrix",
+        "risk_appetite",
+        "escalation_owner"
+      ],
+      "title": "GovernancePlaceholders",
+      "type": "object"
+    },
+    "OrganizationPlaceholders": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 2,
+          "question": "What organization name should appear in the workflow?",
+          "title": "Name",
+          "type": "string"
+        },
+        "process_owner": {
+          "minLength": 2,
+          "question": "Who owns the process and its operating outcome?",
+          "title": "Process Owner",
+          "type": "string"
+        },
+        "monthly_volume": {
+          "maximum": 10000000,
+          "minimum": 1,
+          "question": "How many cases does this process handle per month?",
+          "title": "Monthly Volume",
+          "type": "integer"
+        },
+        "data_sensitivity": {
+          "$ref": "#/$defs/DataSensitivity",
+          "question": "What is the highest data-sensitivity level in scope?"
+        },
+        "locales": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "question": "Which locale codes must the workflow support?",
+          "title": "Locales",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "process_owner",
+        "monthly_volume",
+        "data_sensitivity",
+        "locales"
+      ],
+      "title": "OrganizationPlaceholders",
+      "type": "object"
+    },
+    "RiskAppetite": {
+      "enum": [
+        "conservative",
+        "balanced"
+      ],
+      "title": "RiskAppetite",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "organization": {
+      "$ref": "#/$defs/OrganizationPlaceholders"
+    },
+    "governance": {
+      "$ref": "#/$defs/GovernancePlaceholders"
+    },
+    "credit": {
+      "$ref": "#/$defs/CreditPlaceholders"
+    }
+  },
+  "required": [
+    "organization",
+    "governance",
+    "credit"
+  ],
+  "title": "BankPlaceholders",
+  "type": "object"
+}

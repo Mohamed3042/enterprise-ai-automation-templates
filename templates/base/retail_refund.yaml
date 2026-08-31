@@ -1,0 +1,81 @@
+metadata:
+  id: retail_refund
+  name: "{{organization.name}} — governed refund and price adjustment"
+  version: "1.0.0"
+  sector: retail
+  description: "One refund workflow compiled against {{regional.policy_pack}} for {{regional.region}}."
+actors:
+  - role: customer_service_agent
+    responsibility: Submit a synthetic request and supporting facts.
+  - role: regional_refund_manager
+    responsibility: Review AI drafts and own consequential refund decisions.
+  - role: risk_owner
+    responsibility: Own escalations and the organization kill switch.
+stages:
+  - id: receive_request
+    name: Receive and scope request
+    action_type: system_action
+    risk_tier: LOW
+    inputs:
+      process_owner: "{{organization.process_owner}}"
+      allowed_actions: [refund, price_adjustment]
+    outputs:
+      required: []
+    escalation_rules: [missing_transaction_reference]
+    sla_hours: 1
+    audit_tags: [retail, intake, synthetic]
+    approval_roles: []
+  - id: classify_refund
+    name: Draft regional classification
+    action_type: ai_classify
+    risk_tier: MEDIUM
+    inputs:
+      policy_pack: "{{regional.policy_pack}}"
+      data_sensitivity: "{{organization.data_sensitivity}}"
+      allowed_actions: [refund, price_adjustment]
+    outputs:
+      required: [summary, recommendation, confidence]
+      numeric_bounds:
+        confidence: [0, 1]
+    escalation_rules: [policy_conflict, suspected_prompt_injection, value_above_refund_limit]
+    sla_hours: 2
+    audit_tags: [retail, ai_draft, regional]
+    approval_roles: [regional_refund_manager]
+  - id: regional_review
+    name: Regional manager review — {{regional.region}}
+    action_type: human_review
+    risk_tier: MEDIUM
+    inputs:
+      refund_limit: "{{regional.refund_limit}}"
+      currency: "{{regional.currency}}"
+    outputs:
+      required: [decision, reason]
+    escalation_rules: [authority_limit_exceeded]
+    sla_hours: 8
+    audit_tags: [retail, human_review]
+    approval_roles: [regional_refund_manager]
+  - id: authorize_adjustment
+    name: Human authorization for consequential adjustment
+    action_type: human_approve
+    risk_tier: HIGH
+    inputs:
+      authority_matrix: "{{governance.approval_authority_matrix}}"
+    outputs:
+      required: [decision, reason, signature]
+    escalation_rules: [role_outside_authority_matrix]
+    sla_hours: 12
+    audit_tags: [retail, high_risk, human_decision]
+    approval_roles: [regional_refund_manager]
+  - id: notify_customer
+    name: Notify synthetic customer
+    action_type: notify
+    risk_tier: LOW
+    inputs:
+      locales: "{{organization.locales}}"
+    outputs:
+      required: []
+    escalation_rules: [delivery_failure]
+    sla_hours: 2
+    audit_tags: [retail, notification]
+    approval_roles: []
+
