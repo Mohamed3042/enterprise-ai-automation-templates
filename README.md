@@ -187,9 +187,9 @@ engine function as the JSON API and tests.
 CI runs Ruff, the complete pytest suite, and `python -m atmpl redteam` on every push.
 
 - [Full pytest output](docs/proof/pytest_full.txt)
+- [Clean-clone acceptance](docs/proof/clean_clone_acceptance.txt)
 - [RED-before evidence](docs/proof/redteam_red_before.txt)
 - [GREEN-after evidence](docs/proof/redteam_green_after.txt)
 - [Live screenshot capture script](scripts/capture_screenshots.py)
 
 MIT licensed. Built as a public portfolio demonstration by Mohamed Mahmoud.
-

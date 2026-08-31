@@ -1,0 +1,39 @@
+CLEAN-CLONE ACCEPTANCE
+Date: 2026-08-31
+Source: https://github.com/Mohamed3042/enterprise-ai-automation-templates
+Source commit: 562ff51
+Python: 3.12.10
+
+1. git clone https://github.com/Mohamed3042/enterprise-ai-automation-templates.git
+   RESULT: PASS
+
+2. py -3.12 -m venv .venv
+   .venv\Scripts\python.exe -m pip install -e ".[dev]"
+   RESULT: PASS - editable wheel built and all dependencies installed.
+
+3. .venv\Scripts\ruff.exe check .
+   RESULT: All checks passed!
+
+4. .venv\Scripts\python.exe -m pytest
+   RESULT: 71 passed in 7.32s
+
+5. .venv\Scripts\python.exe -m atmpl redteam
+   RESULT: REDTEAM: 24/24 BLOCKED
+
+6. .venv\Scripts\python.exe -m atmpl demo up --host 127.0.0.1 --port 8766
+   RESULT: SEEDED retail + ministry + bank; Uvicorn application startup complete.
+
+7. Live HTTP assertions
+   /                              200 - Ship governed automation
+   /runs/run_bank_override       200 - ROUTE_TO_TIER_2
+   /runs/run_ministry_ar_math    200 - خطة درس الرياضيات
+   /approvals                    200 - Pending approvals
+   /audit                        200 - CHAIN VERIFIED
+   /redteam                      200 - 24 / 24 attacks blocked
+   RESULT: LIVE_HTTP_OK, 6/6
+
+8. .venv\Scripts\python.exe -m atmpl audit verify --path var\audit.jsonl
+   RESULT: AUDIT VERIFIED: 25 records
+
+No API key was set or required. All seeded records were synthetic.
+
