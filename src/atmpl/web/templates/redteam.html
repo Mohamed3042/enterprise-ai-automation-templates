@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Red-team results{% endblock %}
+{% block content %}
+<section class="page-header page-shell redteam-header">
+  <p class="eyebrow">MEASURED ADVERSARIAL EVIDENCE</p>
+  <div class="header-row"><div><h1>24 / 24 attacks blocked</h1><p>R1–R8 execute across all three synthetic demos. The suite was captured RED before implementation, then GREEN.</p></div><span class="blocked-score">100% BLOCKED</span></div>
+</section>
+<section class="section page-shell">
+  <div class="redteam-grid">
+  {% for result in results %}
+    <article><div><span class="case-id">{{ result.case_id }}</span><span class="demo-tag">{{ result.demo }}</span></div><h2>{{ result.expectation }}</h2><p>{{ result.detail }}</p><strong class="blocked-status">✓ {{ result.status }}</strong></article>
+  {% endfor %}
+  </div>
+</section>
+{% endblock %}
+

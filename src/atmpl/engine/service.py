@@ -208,6 +208,11 @@ class AutomationEngine:
                     G1_RISK_TIERS,
                     f"Stage '{stage_key}' is not an AI drafting stage.",
                 )
+            if stage.status not in {StageStatus.PENDING.value, StageStatus.PARKED.value}:
+                raise GuardrailRejection(
+                    G1_RISK_TIERS,
+                    f"Stage '{stage_key}' cannot be drafted from status '{stage.status}'.",
+                )
             enabled = check_ai_enabled(org.kill_switch)
             if not enabled.allowed:
                 stage.status = StageStatus.PARKED.value
@@ -296,6 +301,11 @@ class AutomationEngine:
             stage = self._stage(session, run_id, stage_key)
             if stage.risk_tier != RiskTier.LOW.value:
                 raise GuardrailRejection(G1_RISK_TIERS, "Only LOW stages may auto-complete.")
+            if stage.status != StageStatus.PENDING.value:
+                raise GuardrailRejection(
+                    G1_RISK_TIERS,
+                    f"LOW stage cannot complete from status '{stage.status}'.",
+                )
             stage.status = outcome.status.value
             org_id, stage_id = stage.run.organization_id, stage.id
             session.commit()
@@ -323,6 +333,14 @@ class AutomationEngine:
         with self.database.session() as session:
             stage = self._stage(session, run_id, stage_key)
             try:
+                if stage.status not in {
+                    StageStatus.PENDING.value,
+                    StageStatus.DRAFT_READY.value,
+                }:
+                    raise GuardrailRejection(
+                        G1_RISK_TIERS,
+                        f"Stage cannot be decided from status '{stage.status}'.",
+                    )
                 if stage.risk_tier == RiskTier.HIGH.value:
                     outcome = decide_high(decision, stage.allowed_roles)
                 elif stage.risk_tier == RiskTier.MEDIUM.value:
@@ -424,4 +442,3 @@ class AutomationEngine:
             guardrail=G6_KILL_SWITCH,
             detail="Kill switch change was human-signed and audited as HIGH risk.",
         )
-

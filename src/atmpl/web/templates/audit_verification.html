@@ -1,0 +1,5 @@
+<div class="verification {% if verification.valid %}valid{% else %}invalid{% endif %}">
+  <span class="verification-icon">{% if verification.valid %}✓{% else %}!{% endif %}</span>
+  <div><strong>{% if verification.valid %}CHAIN VERIFIED{% else %}TAMPERING DETECTED{% endif %}</strong><p>{% if verification.valid %}{{ verification.count }} records · last hash {{ verification.last_hash[:18] }}…{% else %}{{ verification.error }}{% endif %}</p></div>
+</div>
+

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Enterprise automation portfolio{% endblock %}
+{% block content %}
+<section class="hero page-shell">
+  <div>
+    <p class="eyebrow">DISCOVER → COMPILE → GOVERN → PROVE</p>
+    <h1>Ship governed automation<br><em>in days, not months.</em></h1>
+    <p class="hero-copy">A consulting-grade template system that turns structured discovery into typed workflows—without delegating final authority to AI.</p>
+    <div class="hero-actions">
+      <a class="button primary" href="/approvals">Open approval queue</a>
+      <a class="button secondary" href="/runs/run_bank_override">See the human override</a>
+    </div>
+  </div>
+  <aside class="authority-card">
+    <span class="lock-icon">H</span>
+    <p class="eyebrow">NON-NEGOTIABLE INVARIANT</p>
+    <h2>HIGH risk is human-decided.</h2>
+    <p>The AI can summarize, flag, and recommend. The transition accepts only a signed human decision object.</p>
+    <code>decide_high(decision, allowed_roles)</code>
+  </aside>
+</section>
+
+<section class="metric-grid page-shell" aria-label="Portfolio metrics">
+  <article><strong>{{ metrics.organizations }}</strong><span>synthetic organizations</span></article>
+  <article><strong>{{ metrics.workflows }}</strong><span>compiled workflows</span></article>
+  <article><strong>{{ metrics.runs }}</strong><span>seeded runs</span></article>
+  <article><strong>{{ metrics.pending }}</strong><span>open human gates</span></article>
+</section>
+
+<section class="section page-shell">
+  <div class="section-heading">
+    <div><p class="eyebrow">ONE METHOD, THREE CONTEXTS</p><h2>From discovery answers to governed operation</h2></div>
+    <p>Each workflow comes from a typed template and an explicit authority matrix.</p>
+  </div>
+  <div class="org-grid">
+    {% for org in organizations %}
+    <article class="org-card">
+      <div class="org-card-head">
+        <div><span class="sector">{{ org.sector }}</span><h3 dir="auto">{{ org.name }}</h3></div>
+        <span class="synthetic-pill">SYNTHETIC</span>
+      </div>
+      <p>{{ org.workflows|length }} compiled workflow{% if org.workflows|length != 1 %}s{% endif %} · {{ org.runs|length }} runs</p>
+      <ul class="run-list">
+        {% for run in org.runs[:3] %}
+        <li><a href="/runs/{{ run.id }}"><span dir="auto">{{ run.title }}</span><span class="status {{ run.status }}">{{ run.status }}</span></a></li>
+        {% endfor %}
+      </ul>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section dark-section">
+  <div class="page-shell">
+    <div class="section-heading inverse">
+      <div><p class="eyebrow">SAFETY AS ARCHITECTURE</p><h2>Seven invariants, not seven promises</h2></div>
+      <a class="text-link" href="/redteam">View 24 blocked attacks →</a>
+    </div>
+    <div class="invariant-grid">
+      {% for code, description in invariants.items() %}
+      <article><span>{{ code }}</span><p>{{ description }}</p></article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section page-shell">
+  <div class="section-heading"><div><p class="eyebrow">OPERATING EVIDENCE</p><h2>Recent workflow runs</h2></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Organization</th><th>Run</th><th>Region</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for run in recent_runs %}
+        <tr><td>{{ run.organization.name }}</td><td><a href="/runs/{{ run.id }}" dir="auto">{{ run.title }}</a></td><td>{{ run.region }}</td><td><span class="status {{ run.status }}">{{ run.status }}</span></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+

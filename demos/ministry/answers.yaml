@@ -1,0 +1,18 @@
+organization:
+  name: Ministry of Education — Synthetic Learning Lab
+  process_owner: Synthetic Curriculum Operations Owner
+  monthly_volume: 4200
+  data_sensitivity: internal
+  locales: [ar, en]
+governance:
+  approval_authority_matrix:
+    curriculum_alignment: department_head
+    publication_quality: qa_lead
+  risk_appetite: conservative
+  escalation_owner: Synthetic Education Risk Owner
+curriculum:
+  framework: Synthetic National Curriculum Framework 2030
+  department_head_role: department_head
+  qa_role: qa_lead
+  publish_channel: Synthetic Teacher Knowledge Portal
+

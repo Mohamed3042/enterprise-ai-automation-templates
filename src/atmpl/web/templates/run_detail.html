@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ run.title }}{% endblock %}
+{% block content %}
+<section class="page-header page-shell">
+  <a class="back-link" href="/">← Portfolio</a>
+  <div class="header-row">
+    <div><p class="eyebrow">{{ run.organization.name }} · {{ run.region }}</p><h1 dir="auto">{{ run.title }}</h1></div>
+    <span class="status large {{ run.status }}">{{ run.status }}</span>
+  </div>
+  <p>{{ run.workflow.name }} · <span class="synthetic-pill">SYNTHETIC DATA</span></p>
+</section>
+
+{% if run.id == "run_bank_override" and terminal_decision %}
+<section class="override-shot page-shell">
+  <div class="override-label">HUMAN AUTHORITY · CAPTURED IN AUDIT</div>
+  <div class="override-grid">
+    <article><span>AI draft recommendation</span><strong>{{ ai_recommendation }}</strong><p>Routing guidance only. No approval or rejection authority.</p></article>
+    <div class="override-arrow">→</div>
+    <article class="human-panel"><span>Human terminal decision</span><strong>{{ terminal_decision.decision|upper }}</strong><p dir="auto">{{ terminal_decision.reason }}</p><small>Signed by {{ terminal_decision.actor }} · {{ terminal_decision.role }}</small></article>
+  </div>
+</section>
+{% endif %}
+
+<section class="section page-shell">
+  <div class="section-heading"><div><p class="eyebrow">STAGE-BY-STAGE EVIDENCE</p><h2>Governed timeline</h2></div><p>AI drafts and human decisions are deliberately separate records.</p></div>
+  <div class="timeline">
+    {% for stage in run.stages %}
+    <article class="stage-card {{ stage.status }}">
+      <div class="stage-index">{{ "%02d"|format(stage.position) }}</div>
+      <div class="stage-main">
+        <div class="stage-heading">
+          <div><span class="action-type">{{ stage.action_type }}</span><h3 dir="auto">{{ stage.name }}</h3></div>
+          <div><span class="risk {{ stage.risk_tier|lower }}">{{ stage.risk_tier }}</span><span class="status {{ stage.status }}">{{ stage.status }}</span></div>
+        </div>
+        {% if stage.risk_tier == "HIGH" %}<p class="human-only">HUMAN-ONLY TRANSITION · Signed decision required; no automatic branch exists.</p>{% endif %}
+        {% if stage.escalation_reason %}<div class="alert"><strong>Escalated</strong><span>{{ stage.escalation_reason }}</span></div>{% endif %}
+        <div class="evidence-grid">
+          {% if stage.input_data %}
+          <section class="evidence input-panel"><p class="panel-label">VALIDATED INPUT</p><pre dir="auto">{{ stage.input_data|prettyjson }}</pre></section>
+          {% endif %}
+          {% if stage.draft %}
+          <section class="evidence draft-panel"><p class="panel-label">AI DRAFT · NOT AUTHORITY</p><pre dir="auto">{{ stage.draft.content|prettyjson }}</pre></section>
+          {% endif %}
+          {% if stage.decision %}
+          <section class="evidence decision-panel"><p class="panel-label">SIGNED HUMAN DECISION</p><strong>{{ stage.decision.decision|upper }}</strong><p dir="auto">{{ stage.decision.reason }}</p><dl><dt>Actor</dt><dd dir="auto">{{ stage.decision.actor }}</dd><dt>Role</dt><dd>{{ stage.decision.role }}</dd><dt>Signature</dt><dd><code>{{ stage.decision.signature }}</code></dd></dl></section>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,22 @@
+organization:
+  name: Gulf Horizon Bank
+  process_owner: Synthetic Credit Operations Owner
+  monthly_volume: 6800
+  data_sensitivity: restricted
+  locales: [ar, en]
+governance:
+  approval_authority_matrix:
+    under_25000: credit_officer_tier_1
+    from_25000_to_100000: credit_officer_tier_2
+    above_100000: senior_credit_committee
+  risk_appetite: conservative
+  escalation_owner: Synthetic Chief Credit Risk Owner
+credit:
+  authority_bands:
+    "0-24999": credit_officer_tier_1
+    "25000-100000": credit_officer_tier_2
+    "100001-500000": senior_credit_committee
+  maximum_application_amount: 500000
+  completeness_threshold: 80
+  terminal_decision_role: credit_officer_tier_2
+

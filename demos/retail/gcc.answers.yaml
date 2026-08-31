@@ -1,0 +1,18 @@
+organization:
+  name: OmniMart Global
+  process_owner: Synthetic Retail Operations Owner
+  monthly_volume: 18000
+  data_sensitivity: confidential
+  locales: [ar, en]
+governance:
+  approval_authority_matrix:
+    standard_refund: regional_refund_manager
+    exceptional_refund: risk_owner
+  risk_appetite: conservative
+  escalation_owner: Synthetic Retail Risk Owner
+regional:
+  region: GCC
+  policy_pack: gcc_consumer
+  refund_limit: 500
+  currency: KWD
+

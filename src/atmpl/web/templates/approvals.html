@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Pending approvals{% endblock %}
+{% block content %}
+<section class="page-header page-shell">
+  <p class="eyebrow">HUMAN AUTHORITY QUEUE</p>
+  <div class="header-row"><div><h1>Pending approvals</h1><p>Every decision uses the same typed engine boundary as the API and tests.</p></div><span class="queue-count">{{ pending|length }} open gates</span></div>
+</section>
+<section class="section page-shell approval-list">
+  {% for stage in pending %}
+  <article class="approval-card">
+    <div class="approval-meta">
+      <span class="risk {{ stage.risk_tier|lower }}">{{ stage.risk_tier }}</span>
+      <span>{{ stage.run.organization.name }}</span>
+      <a href="/runs/{{ stage.run.id }}" dir="auto">{{ stage.run.title }}</a>
+    </div>
+    <div class="approval-body">
+      <div><p class="action-type">{{ stage.action_type }}</p><h2 dir="auto">{{ stage.name }}</h2>{% if stage.draft %}<div class="compact-draft"><span>AI draft</span><strong>{{ stage.draft.content.recommendation }}</strong><p dir="auto">{{ stage.draft.content.summary }}</p></div>{% endif %}</div>
+      <form hx-post="/api/runs/{{ stage.run.id }}/stages/{{ stage.stage_key }}/decision" hx-target="#result-{{ stage.id }}" hx-swap="innerHTML" method="post">
+        <label>Human actor<input name="actor" value="Synthetic Dashboard Reviewer" required minlength="2"></label>
+        <label>Authority role<select name="role" required>{% for role in stage.allowed_roles %}<option value="{{ role }}">{{ role }}</option>{% endfor %}</select></label>
+        <label>Reason<textarea name="reason" required minlength="3" placeholder="Document the human rationale"></textarea></label>
+        <input type="hidden" name="signature" value="sig_dashboard_{{ stage.id }}">
+        <div class="decision-actions"><button class="button approve" name="decision" value="approve">Approve</button><button class="button reject" name="decision" value="reject">Reject</button></div>
+        <div id="result-{{ stage.id }}" class="inline-result" aria-live="polite"></div>
+      </form>
+    </div>
+  </article>
+  {% else %}
+  <div class="empty-state"><h2>No open approvals</h2><p>All seeded human gates have a recorded outcome.</p></div>
+  {% endfor %}
+</section>
+{% endblock %}
+

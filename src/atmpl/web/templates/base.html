@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Governed enterprise AI automation template demonstration">
+    <title>{% block title %}Control Room{% endblock %} · ATMPL</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
+    <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="ATMPL dashboard home">
+        <span class="brand-mark">A</span>
+        <span><strong>ATMPL</strong><small>Governed automation control room</small></span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/">Portfolio</a>
+        <a href="/approvals">Approvals</a>
+        <a href="/audit">Audit</a>
+        <a href="/redteam">Red team</a>
+      </nav>
+    </header>
+    <div class="synthetic-banner">
+      SYNTHETIC DEMO · Every organization, person, record, and event shown here is fake.
+    </div>
+    <main>{% block content %}{% endblock %}</main>
+    <footer>
+      <span>Human authority is the product boundary.</span>
+      <span>Offline mock adapter · SHA-256 audit chain · G1–G7</span>
+    </footer>
+  </body>
+</html>
+
