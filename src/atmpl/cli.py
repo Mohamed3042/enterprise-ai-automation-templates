@@ -16,7 +16,7 @@ import yaml
 from sqlalchemy import inspect, select
 
 from atmpl.audit import verify_audit
-from atmpl.demos import seed_demo_data, seed_inbound_sources
+from atmpl.demos import seed_demo_data, seed_demo_subscription, seed_inbound_sources
 from atmpl.engine.database import ApiKey, Database
 from atmpl.engine.service import AutomationEngine
 from atmpl.intake.resolver import DiscoveryError, init_discovery, resolve_discovery
@@ -216,8 +216,22 @@ def _command_demo_up(args: argparse.Namespace) -> int:
     database = Database(settings.database_url, create_all=settings.create_schema_on_start)
     engine = seed_demo_data(root / "demo.db", root / "audit.jsonl", database=database)
     inbound = seed_inbound_sources(engine)
+    # A provider-configured secret wins at verification time, so print what a caller must use.
+    resolver = build_context(engine, settings).secrets
+    inbound = {
+        source: resolver.get(f"webhook_inbound_{source}") or secret
+        for source, secret in inbound.items()
+    }
     DEMO_SECRETS_FILE.parent.mkdir(parents=True, exist_ok=True)
     DEMO_SECRETS_FILE.write_text(json.dumps(inbound, indent=2), encoding="utf-8")
+
+    receiver_url = os.getenv("ATMPL_DEMO_SUBSCRIBE_URL")
+    receiver_secret = os.getenv("ATMPL_DEMO_SUBSCRIBE_SECRET")
+    subscription_id = (
+        seed_demo_subscription(engine, receiver_url, receiver_secret)
+        if receiver_url and receiver_secret
+        else None
+    )
 
     print("SEEDED: retail + ministry + bank (synthetic, deterministic, offline)")
     print(f"DATABASE: {settings.database_url} (migrations at {revision})")
@@ -227,6 +241,8 @@ def _command_demo_up(args: argparse.Namespace) -> int:
         print("MODE: demo mode - no login; decisions are recorded as human:demo")
     for source, secret in inbound.items():
         print(f"WEBHOOK IN: POST /api/v1/webhooks/{source} - secret {secret}")
+    if subscription_id:
+        print(f"WEBHOOK OUT: every event -> {receiver_url} (subscription {subscription_id})")
     print(f"(inbound secrets also written to {DEMO_SECRETS_FILE})")
     uvicorn.run(
         create_app(engine, settings),

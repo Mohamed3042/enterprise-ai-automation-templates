@@ -64,3 +64,5 @@ table td.truncate { max-width: 22rem; overflow: hidden; text-overflow: ellipsis;
 .login-form input { padding: .55rem .7rem; border: 1px solid #c6d8d4; border-radius: 8px; font: inherit; }
 .delivery-panel { margin-top: 1rem; }
 @media (max-width: 780px) { .login-shell { grid-template-columns: 1fr; } }
+.evidence.event-panel { border-left: 3px solid #117e6a; }
+.evidence.event-panel .panel-label { color: #117e6a; }

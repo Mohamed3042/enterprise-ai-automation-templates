@@ -95,10 +95,19 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "object-src 'none'",
             ]
         )
+        # Swagger UI and ReDoc bootstrap themselves from an inline <script>, so the two
+        # documentation routes get a deliberately looser policy. They render a static schema
+        # and never touch run data; every other route keeps the strict policy above.
         self.docs_csp = self.csp.replace(
             "script-src 'self'",
-            "script-src 'self' https://cdn.jsdelivr.net",
-        ).replace("style-src 'self'", "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net")
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        ).replace(
+            "style-src 'self'",
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        ).replace(
+            "img-src 'self' data:",
+            "img-src 'self' data: https://cdn.jsdelivr.net https://fastapi.tiangolo.com",
+        )
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)

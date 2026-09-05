@@ -149,6 +149,11 @@ def test_a_signed_event_starts_a_governed_run_with_the_event_as_evidence(client,
     assert evidence["mapped"]["ticket_id"] == "SYN-TCK-8801"
     assert evidence["mapped"]["customer_email"] == "[REDACTED]", "G3 redaction must still apply"
 
+    page = client.get(f"/runs/{body['run_id']}")
+    rendered = page.text.split("</head>", 1)[1]
+    assert "INBOUND EVENT · RECORDED EVIDENCE" in rendered
+    assert "SYN-TCK-8801" in rendered
+
     with seeded_engine.database.session() as session:
         event = session.scalar(
             select(AuditEvent)
@@ -394,8 +399,12 @@ def test_the_webhooks_page_and_the_run_page_show_the_delivery(client, receiver):
     assert page.status_code == 200
     assert "run.stage.decided" in page.text
     assert "1 delivered" in page.text
-    assert "Webhook deliveries for this run" in run_page.text
-    assert "run.stage.decided" in run_page.text
+    # Assert WHERE it renders, not merely that the string exists: a Jinja block mistake once
+    # put this whole panel inside <title>, where a substring check still passed.
+    body = run_page.text.split("</head>", 1)[1]
+    assert "<h2>Webhook deliveries for this run</h2>" in body
+    assert body.index("Governed timeline") < body.index("Webhook deliveries for this run")
+    assert "run.stage.decided" in body
 
 
 def test_the_cli_worker_pass_uses_the_same_code_path(client, receiver, seeded_engine):

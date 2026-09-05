@@ -1,0 +1,71 @@
+name: atmpl
+
+services:
+  db:
+    image: postgres:16.11-bookworm
+    environment:
+      POSTGRES_USER: atmpl
+      POSTGRES_PASSWORD: atmpl_synthetic_demo
+      POSTGRES_DB: atmpl
+    volumes:
+      - atmpl-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atmpl -d atmpl"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      target: runtime
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ATMPL_DATABASE_URL: postgresql+psycopg://atmpl:atmpl_synthetic_demo@db:5432/atmpl
+      # Synthetic demo values. A real deployment supplies these from its own secret store.
+      ATMPL_SECRET_JWT_SIGNING_KEY: synthetic_compose_jwt_key_change_me_0123456789abcdef
+      ATMPL_SECRET_SESSION_SIGNING_KEY: synthetic_compose_session_key_change_me_abcdef0123
+      ATMPL_SECRET_WEBHOOK_INBOUND_HELPDESK: whsec_synthetic_compose_helpdesk
+      ATMPL_SECRET_WEBHOOK_INBOUND_CASE_INTAKE: whsec_synthetic_compose_case_intake
+      ATMPL_WEBHOOK_WORKER: "1"
+      ATMPL_RATE_LIMIT: 240/minute
+      ATMPL_PUBLIC_BASE_URL: http://127.0.0.1:8000
+      # Used only when the `receiver` profile is up; harmless otherwise.
+      ATMPL_DEMO_SUBSCRIBE_URL: http://receiver:8181/hook
+      ATMPL_DEMO_SUBSCRIBE_SECRET: whsec_synthetic_compose_receiver
+    ports:
+      - "8000:8000"
+    volumes:
+      # The hash-chained ledger is a FILE. Postgres holds the state; without this volume a
+      # container rebuild leaves the database populated and the ledger gone, and
+      # `audit verify` correctly reports the chain as missing.
+      - atmpl-var:/app/var
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 25s
+    restart: unless-stopped
+
+  # `docker compose --profile receiver up` adds a receiver so an outbound delivery is
+  # visible end to end: decide on the dashboard, watch the receipt appear on /webhooks.
+  receiver:
+    profiles: ["receiver"]
+    image: python:3.12-slim-bookworm
+    working_dir: /app
+    environment:
+      ATMPL_RECEIVER_SECRET: whsec_synthetic_compose_receiver
+    volumes:
+      - ./scripts:/app/scripts:ro
+    command: ["python", "/app/scripts/demo_receiver.py"]
+    ports:
+      - "8181:8181"
+    restart: unless-stopped
+
+volumes:
+  atmpl-db:
+  atmpl-var:

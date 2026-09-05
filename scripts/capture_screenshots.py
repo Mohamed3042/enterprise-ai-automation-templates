@@ -28,6 +28,17 @@ def _launch_chromium(playwright: Playwright) -> Browser:
         ) from channel_error
 
 
+def _webhook_run_path(page) -> str:
+    """The run a signed inbound webhook started, found by its mapped title."""
+    page.goto(f"{BASE_URL}/", wait_until="networkidle")
+    link = page.get_by_role("link", name="Helpdesk ticket", exact=False).first
+    if link.count() == 0:
+        raise RuntimeError(
+            "No webhook-started run on the dashboard. Send one first: see docs/webhooks.md."
+        )
+    return str(link.get_attribute("href"))
+
+
 def main() -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     shots = (
@@ -45,6 +56,8 @@ def main() -> None:
         ("pending-approvals.png", "/approvals", "Pending approvals"),
         ("audit-verify.png", "/audit", "CHAIN VERIFIED"),
         ("redteam-results.png", "/redteam", "24 / 24 attacks blocked"),
+        ("webhook-deliveries.png", "/webhooks", "Delivery attempts"),
+        ("api-docs.png", "/api/v1/docs", "Enterprise AI Automation Templates API"),
     )
     with sync_playwright() as playwright:
         browser = _launch_chromium(playwright)
@@ -59,6 +72,13 @@ def main() -> None:
                 page.locator("#verification .valid").wait_for()
             page.screenshot(path=OUTPUT / filename, full_page=True)
             print(f"CAPTURED {filename} from {path}")
+
+        if os.getenv("ATMPL_CAPTURE_WEBHOOK_RUN", "1") == "1":
+            run_path = _webhook_run_path(page)
+            page.goto(f"{BASE_URL}{run_path}", wait_until="networkidle")
+            page.get_by_text("VALIDATED INPUT", exact=False).first.wait_for()
+            page.screenshot(path=OUTPUT / "webhook-started-run.png", full_page=True)
+            print(f"CAPTURED webhook-started-run.png from {run_path}")
         browser.close()
 
 

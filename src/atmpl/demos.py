@@ -8,7 +8,13 @@ from typing import Any
 from sqlalchemy import func, select
 
 from atmpl.catalog import PROJECT_ROOT
-from atmpl.engine.database import Database, Organization, RedTeamResult, Run
+from atmpl.engine.database import (
+    Database,
+    Organization,
+    RedTeamResult,
+    Run,
+    WebhookSubscription,
+)
 from atmpl.engine.service import AutomationEngine
 from atmpl.intake.resolver import resolve_discovery
 from atmpl.redteam.contracts import EXPECTATIONS, run_all
@@ -464,6 +470,26 @@ def _seed_redteam_results(database: Database) -> None:
             ]
         )
         session.commit()
+
+
+def seed_demo_subscription(engine: AutomationEngine, url: str, secret: str) -> str | None:
+    """Point the demos at a receiver (Compose's `receiver` profile). Idempotent by URL."""
+    with engine.database.session() as session:
+        existing = session.scalar(
+            select(WebhookSubscription).where(WebhookSubscription.url == url)
+        )
+        if existing:
+            return existing.id
+        subscription = WebhookSubscription(
+            url=url,
+            description="Synthetic demo receiver",
+            secret=secret,
+            event_types=[],
+            active=True,
+        )
+        session.add(subscription)
+        session.commit()
+        return subscription.id
 
 
 def seed_demo_data(

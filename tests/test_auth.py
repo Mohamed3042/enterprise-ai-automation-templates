@@ -393,6 +393,18 @@ def test_cors_allowlist_is_off_until_configured(seeded_engine, settings_factory)
     )
 
 
+def test_the_docs_page_gets_the_only_relaxed_csp(client):
+    """Swagger bootstraps from an inline script; nothing else is allowed to."""
+    docs = client.get("/api/v1/docs").headers["Content-Security-Policy"]
+    dashboard = client.get("/").headers["Content-Security-Policy"]
+    api = client.get("/api/v1/health").headers["Content-Security-Policy"]
+
+    assert "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net" in docs
+    assert "'unsafe-inline'" not in dashboard
+    assert "'unsafe-inline'" not in api
+    assert "frame-ancestors 'none'" in docs
+
+
 def test_hsts_only_appears_when_it_is_switched_on(seeded_engine, settings_factory):
     from fastapi.testclient import TestClient
 

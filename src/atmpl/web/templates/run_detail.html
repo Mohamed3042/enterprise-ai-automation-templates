@@ -1,26 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ run.title }}<section class="section page-shell delivery-panel">
-  <div class="section-heading"><div><p class="eyebrow">OUTBOUND EVIDENCE</p><h2>Webhook deliveries for this run</h2></div><p>What the calling system was told, and whether it acknowledged.</p></div>
-  <div class="table-wrap">
-    <table class="selectable" data-selectable>
-      <thead><tr><th>Status</th><th>Event</th><th>Attempts</th><th>Last code</th><th>Latency</th></tr></thead>
-      <tbody>
-      {% for delivery in deliveries %}
-        <tr tabindex="0">
-          <td><span class="status {{ delivery.status }}">{{ delivery.status }}</span></td>
-          <td><code>{{ delivery.event_type }}</code></td>
-          <td>{{ delivery.attempts }}</td>
-          <td>{{ delivery.last_status_code or "—" }}</td>
-          <td>{{ "%.0f ms"|format(delivery.last_latency_ms) if delivery.last_latency_ms else "—" }}</td>
-        </tr>
-      {% else %}
-        <tr><td colspan="5" class="muted">No outbound delivery is attached to this run.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
-{% endblock %}
+{% block title %}{{ run.title }}{% endblock %}
 {% block content %}
 <section class="page-header page-shell">
   <a class="back-link" href="/">← Portfolio</a>
@@ -56,6 +35,9 @@
         {% if stage.risk_tier == "HIGH" %}<p class="human-only">HUMAN-ONLY TRANSITION · Signed decision required; no automatic branch exists.</p>{% endif %}
         {% if stage.escalation_reason %}<div class="alert"><strong>Escalated</strong><span>{{ stage.escalation_reason }}</span></div>{% endif %}
         <div class="evidence-grid">
+          {% if stage.evidence %}
+          <section class="evidence event-panel"><p class="panel-label">INBOUND EVENT · RECORDED EVIDENCE</p><pre dir="auto">{{ stage.evidence|prettyjson }}</pre></section>
+          {% endif %}
           {% if stage.input_data %}
           <section class="evidence input-panel"><p class="panel-label">VALIDATED INPUT</p><pre dir="auto">{{ stage.input_data|prettyjson }}</pre></section>
           {% endif %}
@@ -69,6 +51,28 @@
       </div>
     </article>
     {% endfor %}
+  </div>
+</section>
+
+<section class="section page-shell delivery-panel">
+  <div class="section-heading"><div><p class="eyebrow">OUTBOUND EVIDENCE</p><h2>Webhook deliveries for this run</h2></div><p>What the calling system was told, and whether it acknowledged.</p></div>
+  <div class="table-wrap">
+    <table class="selectable" data-selectable>
+      <thead><tr><th>Status</th><th>Event</th><th>Attempts</th><th>Last code</th><th>Latency</th></tr></thead>
+      <tbody>
+      {% for delivery in deliveries %}
+        <tr tabindex="0">
+          <td><span class="status {{ delivery.status }}">{{ delivery.status }}</span></td>
+          <td><code>{{ delivery.event_type }}</code></td>
+          <td>{{ delivery.attempts }}</td>
+          <td>{{ delivery.last_status_code or "—" }}</td>
+          <td>{{ "%.0f ms"|format(delivery.last_latency_ms) if delivery.last_latency_ms else "—" }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="muted">No outbound delivery is attached to this run.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
   </div>
 </section>
 {% endblock %}
