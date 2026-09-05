@@ -5,7 +5,6 @@ import json
 import yaml
 
 from atmpl.catalog import PROJECT_ROOT
-from atmpl.demos import DEMO_INBOUND_SOURCES  # noqa: F401  (imported for the source list below)
 
 SNAPSHOT = PROJECT_ROOT / "docs" / "openapi.v1.json"
 
@@ -161,8 +160,11 @@ def test_start_run_read_it_back_and_page_the_list(client):
     first = client.get("/api/v1/runs", params={"limit": 2}).json()
     assert len(first["items"]) == 2
     assert first["has_more"] is True
-    second = client.get("/api/v1/runs", params={"limit": 2, "cursor": first["next_cursor"]}).json()
-    assert {item["id"] for item in first["items"]} & {item["id"] for item in second["items"]} == set()
+    params = {"limit": 2, "cursor": first["next_cursor"]}
+    second = client.get("/api/v1/runs", params=params).json()
+    first_ids = {item["id"] for item in first["items"]}
+    second_ids = {item["id"] for item in second["items"]}
+    assert first_ids & second_ids == set()
 
 
 def test_run_creation_requires_exactly_one_source(client):
