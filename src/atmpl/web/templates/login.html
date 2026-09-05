@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<section class="page-header page-shell">
+  <p class="eyebrow">APPROVALS DASHBOARD</p>
+  <h1>Sign in to decide</h1>
+  <p>Decisions are attributed. The signed-in identity is written into the hash-chained ledger next to the signature.</p>
+</section>
+<section class="section page-shell login-shell">
+  <form class="login-form" method="post" action="/login">
+    {% if error %}<p class="alert" role="alert"><strong>Rejected</strong><span>{{ error }}</span></p>{% endif %}
+    <label>User<input name="username" autocomplete="username" required autofocus></label>
+    <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+    <button class="button primary" type="submit">Sign in</button>
+  </form>
+  <aside class="authority-card">
+    <span class="lock-icon">H</span>
+    <p class="eyebrow">HOW THIS ACCOUNT EXISTS</p>
+    <h2>One admin, from the environment.</h2>
+    <p>The deployment sets <code>ATMPL_ADMIN_USER</code> and a PBKDF2 hash in <code>ATMPL_ADMIN_PASSWORD_HASH</code>. No password is stored in this repository or its database.</p>
+    <code>python -m atmpl users hash-password</code>
+  </aside>
+</section>
+{% endblock %}

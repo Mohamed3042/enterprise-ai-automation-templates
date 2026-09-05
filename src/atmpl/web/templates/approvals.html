@@ -3,7 +3,7 @@
 {% block content %}
 <section class="page-header page-shell">
   <p class="eyebrow">HUMAN AUTHORITY QUEUE</p>
-  <div class="header-row"><div><h1>Pending approvals</h1><p>Every decision uses the same typed engine boundary as the API and tests.</p></div><span class="queue-count">{{ pending|length }} open gates</span></div>
+  <div class="header-row"><div><h1>Pending approvals</h1><p>Every decision uses the same typed engine boundary as the API and tests. Signed in as <code>{{ (principal.actor if principal else "human:demo") }}</code>.</p></div><span class="queue-count">{{ pending|length }} open gates</span></div>
 </section>
 <section class="section page-shell approval-list">
   {% for stage in pending %}
@@ -20,6 +20,7 @@
         <label>Authority role<select name="role" required>{% for role in stage.allowed_roles %}<option value="{{ role }}">{{ role }}</option>{% endfor %}</select></label>
         <label>Reason<textarea name="reason" required minlength="3" placeholder="Document the human rationale"></textarea></label>
         <input type="hidden" name="signature" value="sig_dashboard_{{ stage.id }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="decision-actions"><button class="button approve" name="decision" value="approve">Approve</button><button class="button reject" name="decision" value="reject">Reject</button></div>
         <div id="result-{{ stage.id }}" class="inline-result" aria-live="polite"></div>
       </form>

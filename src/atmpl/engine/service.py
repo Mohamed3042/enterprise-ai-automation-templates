@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy import select
 
@@ -27,6 +27,23 @@ from atmpl.models import (
     StageStatus,
 )
 
+TERMINAL_STAGE_STATUSES = {StageStatus.COMPLETED.value, StageStatus.REJECTED.value}
+
+
+class EventSink(Protocol):
+    """Receives domain events inside the transaction that produced them (outbox pattern)."""
+
+    def __call__(
+        self,
+        session: Any,
+        event_type: str,
+        payload: dict[str, Any],
+        *,
+        organization_id: str | None = None,
+        run_id: str | None = None,
+        stage_id: str | None = None,
+    ) -> None: ...
+
 
 class AutomationEngine:
     def __init__(
@@ -39,6 +56,29 @@ class AutomationEngine:
         self.audit = AuditLog(audit_path, database.session)
         self.adapter = adapter or create_adapter()
         self.policy = DeterministicPolicyEngine()
+        #: Set by the web application so state changes and their events commit together.
+        self.event_sink: EventSink | None = None
+
+    def _emit(
+        self,
+        session: Any,
+        event_type: str,
+        payload: dict[str, Any],
+        *,
+        organization_id: str | None = None,
+        run_id: str | None = None,
+        stage_id: str | None = None,
+    ) -> None:
+        if self.event_sink is None:
+            return
+        self.event_sink(
+            session,
+            event_type,
+            payload,
+            organization_id=organization_id,
+            run_id=run_id,
+            stage_id=stage_id,
+        )
 
     def create_organization(
         self,
@@ -105,6 +145,7 @@ class AutomationEngine:
         region: str,
         run_id: str | None = None,
         stage_overrides: dict[str, dict[str, Any]] | None = None,
+        evidence: dict[str, Any] | None = None,
     ) -> Run:
         stage_overrides = stage_overrides or {}
         with self.database.session() as session:
@@ -141,9 +182,24 @@ class AutomationEngine:
                         decision=override.get("decision"),
                         escalation_reason=override.get("escalation_reason"),
                         allowed_roles=override.get("allowed_roles", definition.approval_roles),
+                        evidence=evidence if position == 1 else None,
                     )
                 )
             session.add(run)
+            session.flush()
+            self._emit(
+                session,
+                "run.started",
+                {
+                    "run_id": run.id,
+                    "workflow_id": workflow_id,
+                    "title": title,
+                    "region": region,
+                    "evidence": evidence,
+                },
+                organization_id=run.organization_id,
+                run_id=run.id,
+            )
             session.commit()
         self.audit.append(
             "run_started",
@@ -177,6 +233,20 @@ class AutomationEngine:
             stage.escalation_reason = detail
             stage.run.status = "escalated"
             org_id, stage_id = stage.run.organization_id, stage.id
+            self._emit(
+                session,
+                "guardrail.blocked",
+                {
+                    "run_id": run_id,
+                    "stage_key": stage_key,
+                    "guardrail": guardrail,
+                    "code": code,
+                    "detail": detail,
+                },
+                organization_id=org_id,
+                run_id=run_id,
+                stage_id=stage_id,
+            )
             session.commit()
         self.audit.append(
             "stage_blocked",
@@ -329,7 +399,15 @@ class AutomationEngine:
         run_id: str,
         stage_key: str,
         decision: SignedHumanDecision,
+        *,
+        principal: str | None = None,
     ) -> EngineResult:
+        """Record a signed human decision.
+
+        ``principal`` is the authenticated identity behind the signature
+        (``human:<user>`` or ``client:<id>``); it is bound into the hash chain beside the
+        decision so a later reviewer sees who was logged in, not only who was typed.
+        """
         with self.database.session() as session:
             stage = self._stage(session, run_id, stage_key)
             try:
@@ -370,6 +448,7 @@ class AutomationEngine:
                     stage_id=stage_id,
                     payload={
                         "guardrail": exc.guardrail,
+                        "principal": principal,
                         "role": decision.role,
                         "decision": decision.decision.value,
                         "reason": str(exc),
@@ -378,10 +457,44 @@ class AutomationEngine:
                 raise
 
             stage.status = outcome.status.value
-            stage.decision = decision.model_dump(mode="json")
+            stage.decision = {**decision.model_dump(mode="json"), "principal": principal}
             org_id, stage_id = stage.run.organization_id, stage.id
+            run = stage.run
             if outcome.status == StageStatus.REJECTED:
-                stage.run.status = "rejected"
+                run.status = "rejected"
+            elif all(
+                candidate.status in TERMINAL_STAGE_STATUSES
+                for candidate in run.stages
+            ):
+                run.status = "completed"
+            run_status = run.status
+            self._emit(
+                session,
+                "run.stage.decided",
+                {
+                    "run_id": run_id,
+                    "stage_key": stage_key,
+                    "risk_tier": stage.risk_tier,
+                    "status": stage.status,
+                    "decision": decision.decision.value,
+                    "reason": decision.reason,
+                    "actor": decision.actor,
+                    "role": decision.role,
+                    "principal": principal,
+                    "guardrail": outcome.guardrail,
+                },
+                organization_id=org_id,
+                run_id=run_id,
+                stage_id=stage_id,
+            )
+            if run_status in {"completed", "rejected"}:
+                self._emit(
+                    session,
+                    "run.completed",
+                    {"run_id": run_id, "status": run_status},
+                    organization_id=org_id,
+                    run_id=run_id,
+                )
             session.commit()
 
         self.audit.append(
@@ -392,6 +505,7 @@ class AutomationEngine:
             stage_id=stage_id,
             payload={
                 "guardrail": outcome.guardrail,
+                "principal": principal,
                 "role": decision.role,
                 "timestamp": decision.timestamp.isoformat(),
                 "decision": decision.decision.value,

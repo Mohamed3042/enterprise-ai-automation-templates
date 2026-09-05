@@ -7,6 +7,7 @@
     <title>{% block title %}Control Room{% endblock %} · ATMPL</title>
     <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
     <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+    <script src="{{ url_for('static', path='/app.js') }}" defer></script>
   </head>
   <body>
     <header class="topbar">
@@ -17,13 +18,30 @@
       <nav aria-label="Primary navigation">
         <a href="/">Portfolio</a>
         <a href="/approvals">Approvals</a>
+        <a href="/webhooks">Webhooks</a>
         <a href="/audit">Audit</a>
         <a href="/redteam">Red team</a>
+        <a href="/api/v1/docs">API</a>
       </nav>
+      <div class="identity">
+        <span class="version-badge" title="Running version">v{{ app_version }}</span>
+        {% if principal and principal.kind.value == "human" %}
+          <span class="who">{{ principal.actor }}</span>
+          <form method="post" action="/logout"><button class="link-button">Sign out</button></form>
+        {% elif not demo_mode %}
+          <a class="who" href="/login">Sign in</a>
+        {% endif %}
+      </div>
     </header>
     <div class="synthetic-banner">
       SYNTHETIC DEMO · Every organization, person, record, and event shown here is fake.
     </div>
+    {% if demo_mode %}
+    <div class="demo-banner" role="status">
+      DEMO MODE — no login; decisions are recorded as <code>human:demo</code>.
+      Set <code>ATMPL_ADMIN_USER</code> and <code>ATMPL_ADMIN_PASSWORD_HASH</code> to require a sign-in.
+    </div>
+    {% endif %}
     <main>{% block content %}{% endblock %}</main>
     <footer>
       <span>Human authority is the product boundary.</span>
@@ -31,4 +49,3 @@
     </footer>
   </body>
 </html>
-

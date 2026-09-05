@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Webhooks{% endblock %}
+{% block content %}
+<section class="page-header page-shell">
+  <p class="eyebrow">EVENTS IN, DECISIONS OUT</p>
+  <div class="header-row">
+    <div>
+      <h1>Webhooks</h1>
+      <p>Inbound events start governed runs. Outbound deliveries tell the caller what the human decided — signed, retried, and receipted.</p>
+    </div>
+    <span class="queue-count">{{ counts.pending }} pending · {{ counts.delivered }} delivered · {{ counts.dead_letter }} dead-letter</span>
+  </div>
+</section>
+
+<section class="section page-shell">
+  <div class="section-heading">
+    <div><p class="eyebrow">MOST RECENT FIRST</p><h2>Delivery attempts</h2></div>
+    <p>Click a row to select it. Buttons are the only thing that navigates or acts.</p>
+  </div>
+  <div class="table-wrap">
+    <table class="selectable" data-selectable>
+      <thead>
+        <tr><th>Status</th><th>Event</th><th>Destination</th><th>Attempts</th><th>Last code</th><th>Latency</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+      {% for delivery in deliveries %}
+        <tr tabindex="0">
+          <td><span class="status {{ delivery.status }}">{{ delivery.status }}</span></td>
+          <td><code>{{ delivery.event_type }}</code></td>
+          <td class="truncate">{{ delivery.subscription.url if delivery.subscription else "—" }}</td>
+          <td>{{ delivery.attempts }}</td>
+          <td>{{ delivery.last_status_code or "—" }}</td>
+          <td>{{ "%.0f ms"|format(delivery.last_latency_ms) if delivery.last_latency_ms else "—" }}</td>
+          <td>
+            {% if delivery.status != "delivered" %}
+            <form method="post" action="/webhooks/deliveries/{{ delivery.id }}/retry">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="button small">Retry delivery</button>
+            </form>
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="muted">No delivery has been attempted yet. Subscribe with <code>POST /api/v1/webhooks/subscriptions</code>.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section page-shell">
+  <div class="section-heading"><div><p class="eyebrow">RECEIVERS</p><h2>Subscriptions</h2></div><p>Signing secrets are shown once, at creation, and never again.</p></div>
+  <div class="table-wrap">
+    <table class="selectable" data-selectable>
+      <thead><tr><th>Destination</th><th>Events</th><th>Description</th><th>Active</th><th>Created</th></tr></thead>
+      <tbody>
+      {% for subscription in subscriptions %}
+        <tr tabindex="0">
+          <td class="truncate">{{ subscription.url }}</td>
+          <td>{% if subscription.event_types %}{% for event in subscription.event_types %}<code>{{ event }}</code> {% endfor %}{% else %}<em>all events</em>{% endif %}</td>
+          <td dir="auto">{{ subscription.description or "—" }}</td>
+          <td>{{ "yes" if subscription.active else "no" }}</td>
+          <td>{{ subscription.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="muted">No subscriptions yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

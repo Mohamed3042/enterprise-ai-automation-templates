@@ -1,0 +1,22 @@
+OpenAPI snapshot gate — fail-first proof (measured 2026-09-05, Windows 11, Python 3.12.10)
+
+The gate: tests/test_api_contract.py::test_served_openapi_matches_the_committed_snapshot
+compares the served /api/v1/openapi.json against the committed docs/openapi.v1.json.
+
+RED — sabotage applied and asserted (an undocumented field added to HealthOut):
+
+    $ python -c "...anchor asserted, 1 occurrence replaced..."
+    SABOTAGE APPLIED: HealthOut gained an undocumented field (1 occurrence replaced)
+
+    $ pytest tests/test_api_contract.py::test_served_openapi_matches_the_committed_snapshot -q
+    tests\test_api_contract.py:263: AssertionError
+    FAILED tests/test_api_contract.py::test_served_openapi_matches_the_committed_snapshot
+    1 failed in 0.79s
+
+GREEN — sabotage reverted, nothing else changed:
+
+    SABOTAGE REVERTED
+    $ pytest tests/test_api_contract.py::test_served_openapi_matches_the_committed_snapshot -q
+    1 passed in 0.79s
+
+Regenerate the snapshot deliberately with: python scripts/export_openapi.py
