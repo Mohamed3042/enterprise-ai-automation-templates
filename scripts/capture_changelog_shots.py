@@ -64,14 +64,14 @@ SHOTS: tuple[tuple[str, str, str, str, str], ...] = (
         "/llmops",
         "What each model actually did",
         "#providers-table .table-wrap",
-        "NEW — every model call this process made: p50/p95, tokens, estimated cost, guardrail trips",
+        "NEW — every model call: p50/p95, tokens, estimated cost, guardrail trips",
     ),
     (
         "02-llmops-span-tree.png",
         "/llmops",
         "Span tree",
         "#span-tree .verification",
-        "NEW — the real span tree of one governed run: run > stage > guardrail, llm.call, guardrail",
+        "NEW — the span tree of one real run: run > stage > guardrail, llm.call, guardrail",
     ),
     (
         "03-evals-report.png",
