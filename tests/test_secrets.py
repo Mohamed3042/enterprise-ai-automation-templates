@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import stat
+from pathlib import Path
 
 import pytest
 from conftest import ADMIN_PASSWORD, ADMIN_USER, auth
@@ -33,9 +34,16 @@ def test_env_backend_reads_prefixed_variables(monkeypatch: pytest.MonkeyPatch):
     assert "jwt_signing_key" in provider.keys()  # noqa: SIM118 - list, not a mapping
 
 
+def _write_secrets_file(path: Path, payload: dict[str, str]) -> Path:
+    """Write a secrets file the backend will accept: 0600 on POSIX, any mode on Windows."""
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    if os.name == "posix":
+        path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    return path
+
+
 def test_file_backend_reads_a_json_object(tmp_path):
-    path = tmp_path / "secrets.json"
-    path.write_text(json.dumps({"JWT_SIGNING_KEY": JWT_SECRET}), encoding="utf-8")
+    path = _write_secrets_file(tmp_path / "secrets.json", {"JWT_SIGNING_KEY": JWT_SECRET})
     provider = FileSecrets(path)
 
     assert provider.get("jwt_signing_key") == JWT_SECRET

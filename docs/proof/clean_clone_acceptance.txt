@@ -1,39 +1,57 @@
-CLEAN-CLONE ACCEPTANCE
-Date: 2026-08-31
-Source: https://github.com/Mohamed3042/enterprise-ai-automation-templates
-Source commit: 562ff51
-Python: 3.12.10
+Clean-clone acceptance — measured 2026-09-06 (Windows 11, Python 3.12.10, uv 0.11.28)
 
-1. git clone https://github.com/Mohamed3042/enterprise-ai-automation-templates.git
-   RESULT: PASS
+Cloned the branch into an empty directory outside the working tree, installed, and ran the
+keyless path with no environment variables, no database and no API key.
 
-2. py -3.12 -m venv .venv
-   .venv\Scripts\python.exe -m pip install -e ".[dev]"
-   RESULT: PASS - editable wheel built and all dependencies installed.
+    $ git clone --branch feat/gaps-atmpl-api --depth 1 \
+        https://github.com/Mohamed3042/enterprise-ai-automation-templates.git clean-clone
+    $ uv venv --python 3.12 .venv && uv pip install -e ".[dev]"
+    $ python -m atmpl demo up --port 8124
 
-3. .venv\Scripts\ruff.exe check .
-   RESULT: All checks passed!
+    SEEDED: retail + ministry + bank (synthetic, deterministic, offline)
+    DATABASE: sqlite:///var/atmpl.db (migrations at 0001)
+    DASHBOARD: http://127.0.0.1:8124
+    API DOCS:  http://127.0.0.1:8124/api/v1/docs
+    MODE: demo mode - no login; decisions are recorded as human:demo
+    WEBHOOK IN: POST /api/v1/webhooks/helpdesk - secret whsec_...
+    WEBHOOK IN: POST /api/v1/webhooks/case_intake - secret whsec_...
+    INFO:     Uvicorn running on http://127.0.0.1:8124 (Press CTRL+C to quit)
 
-4. .venv\Scripts\python.exe -m pytest
-   RESULT: 71 passed in 7.32s
+Measured against that live server:
 
-5. .venv\Scripts\python.exe -m atmpl redteam
-   RESULT: REDTEAM: 24/24 BLOCKED
+    GET  /api/v1/health   -> {"status":"ok","version":"0.2.0","adapter":"mock"}
+    GET  /                -> HTTP 200, 9311 bytes, contains "HIGH risk is human-decided"
+    GET  /redteam         -> contains "24 / 24 attacks blocked"
+    POST /api/v1/audit/verify
+                          -> {"valid":true,"count":25,
+                              "last_hash":"836d6339523bbf886759d16669a307c9e5a7826ad49a398620ac1fe1244d0bbb"}
 
-6. .venv\Scripts\python.exe -m atmpl demo up --host 127.0.0.1 --port 8766
-   RESULT: SEEDED retail + ministry + bank; Uvicorn application startup complete.
+CLI, same clean clone:
 
-7. Live HTTP assertions
-   /                              200 - Ship governed automation
-   /runs/run_bank_override       200 - ROUTE_TO_TIER_2
-   /runs/run_ministry_ar_math    200 - خطة درس الرياضيات
-   /approvals                    200 - Pending approvals
-   /audit                        200 - CHAIN VERIFIED
-   /redteam                      200 - 24 / 24 attacks blocked
-   RESULT: LIVE_HTTP_OK, 6/6
+    $ python -m atmpl keys create --name acme-erp --scopes runs:read,decisions:write
+    API KEY CREATED (shown once - store it now):
+      name:   acme-erp
+      scopes: decisions:write, runs:read
+      key:    atmpl_cfe05f64_...            (throwaway key, this database was discarded)
 
-8. .venv\Scripts\python.exe -m atmpl audit verify --path var\audit.jsonl
-   RESULT: AUDIT VERIFIED: 25 records
+    $ python -m atmpl doctor
+    database        sqlite:///var/atmpl.db
+    tables          14
+    migrations      0001
+    adapter         mock
+    secrets backend env
+    jwt key         EPHEMERAL (restarts invalidate tokens)
+    session key     EPHEMERAL (restarts invalidate sessions)
+    dashboard       DEMO MODE (no login)
+    api             credential required
+    rate limit      120/minute
+    cors origins    none (same-origin only)
+    webhook worker  off (run: atmpl webhooks deliver)
 
-No API key was set or required. All seeded records were synthetic.
+    $ python -m atmpl redteam
+    REDTEAM: 24/24 BLOCKED
 
+The container path was measured separately: `docker compose --profile receiver up` on
+Docker Desktop 29.6.1 reached `Up (healthy)` for api, db and receiver, ran migrations to
+revision 0001 on PostgreSQL 16, accepted a signed inbound webhook, and delivered four signed
+events that the independent receiver verified with the recipe in docs/webhooks.md.
