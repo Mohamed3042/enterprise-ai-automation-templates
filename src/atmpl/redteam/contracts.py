@@ -81,9 +81,11 @@ def r4_data_exfiltration(demo: str) -> RedTeamOutcome:
 
 
 def r5_audit_tamper(demo: str) -> RedTeamOutcome:
-    temp_root = Path.cwd() / ".redteam_tmp"
-    temp_root.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=f"{uuid4().hex}-", dir=temp_root) as directory:
+    # The system temp directory, not the working directory. A container that follows its own
+    # Kubernetes securityContext has `readOnlyRootFilesystem: true`, and writing `.redteam_tmp`
+    # beside the app is then an OSError that takes the whole pod down at seed time. The kind
+    # smoke job in CI is what surfaced that; nothing on a developer machine would have.
+    with tempfile.TemporaryDirectory(prefix=f"atmpl-redteam-{uuid4().hex}-") as directory:
         path = Path(directory) / "audit.jsonl"
         AuditLog(path).append("created", actor="system", payload={"synthetic": True})
         record = json.loads(path.read_text(encoding="utf-8"))
