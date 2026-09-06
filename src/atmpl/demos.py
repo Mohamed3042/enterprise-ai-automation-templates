@@ -8,12 +8,77 @@ from typing import Any
 from sqlalchemy import func, select
 
 from atmpl.catalog import PROJECT_ROOT
-from atmpl.engine.database import Database, Organization, RedTeamResult, Run
+from atmpl.engine.database import (
+    Database,
+    Organization,
+    RedTeamResult,
+    Run,
+    WebhookSubscription,
+)
 from atmpl.engine.service import AutomationEngine
 from atmpl.intake.resolver import resolve_discovery
 from atmpl.redteam.contracts import EXPECTATIONS, run_all
+from atmpl.webhooks.inbound import mapping_block
 
 SYNTHETIC_SIGNATURE = "sig_synthetic_demo_attestation"
+
+#: Inbound sources the demos accept, mapped onto the seeded workflows.
+DEMO_INBOUND_SOURCES = {
+    "helpdesk": {
+        "organization_id": "org_omnimart",
+        "workflow_id": "wf_retail_eu",
+        "title": "Helpdesk ticket {ticket_id} - refund review",
+        "region": "EU",
+        "field_map": {
+            "ticket_id": "ticket.id",
+            "amount": "ticket.refund_amount",
+            "reason": "ticket.subject",
+            "customer_email": "ticket.requester.email",
+        },
+    },
+    "case_intake": {
+        "organization_id": "org_ministry_lab",
+        "workflow_id": "wf_ministry_lesson",
+        "title": "Case intake {case_id} - lesson review",
+        "region": "GLOBAL",
+        "field_map": {
+            "case_id": "case.reference",
+            "subject": "case.subject",
+            "submitted_by": "case.submitted_by",
+        },
+    },
+}
+
+
+def seed_inbound_sources(engine: AutomationEngine) -> dict[str, str]:
+    """Declare the demo inbound mappings on their organizations; return their secrets.
+
+    Secrets are generated per database, never committed. ``ATMPL_SECRET_WEBHOOK_INBOUND_<SOURCE>``
+    overrides the stored value at request time.
+    """
+    secrets_by_source: dict[str, str] = {}
+    with engine.database.session() as session:
+        for source, spec in DEMO_INBOUND_SOURCES.items():
+            organization = session.get(Organization, spec["organization_id"])
+            if organization is None:
+                continue
+            profile = dict(organization.profile or {})
+            webhooks = dict(profile.get("webhooks") or {})
+            inbound = dict(webhooks.get("inbound") or {})
+            existing = inbound.get(source)
+            block = existing or mapping_block(
+                workflow_id=spec["workflow_id"],
+                title=spec["title"],
+                region=spec["region"],
+                field_map=spec["field_map"],
+            )
+            inbound[source] = block
+            webhooks["inbound"] = inbound
+            profile["webhooks"] = webhooks
+            organization.profile = profile
+            secrets_by_source[source] = str(block["secret"])
+        session.commit()
+    return secrets_by_source
 
 
 def _draft(task: str, recommendation: str, summary: str, **extra: Any) -> dict[str, Any]:
@@ -407,8 +472,32 @@ def _seed_redteam_results(database: Database) -> None:
         session.commit()
 
 
-def seed_demo_data(db_path: Path, audit_path: Path) -> AutomationEngine:
-    database = Database(path=db_path)
+def seed_demo_subscription(engine: AutomationEngine, url: str, secret: str) -> str | None:
+    """Point the demos at a receiver (Compose's `receiver` profile). Idempotent by URL."""
+    with engine.database.session() as session:
+        existing = session.scalar(
+            select(WebhookSubscription).where(WebhookSubscription.url == url)
+        )
+        if existing:
+            return existing.id
+        subscription = WebhookSubscription(
+            url=url,
+            description="Synthetic demo receiver",
+            secret=secret,
+            event_types=[],
+            active=True,
+        )
+        session.add(subscription)
+        session.commit()
+        return subscription.id
+
+
+def seed_demo_data(
+    db_path: Path,
+    audit_path: Path,
+    database: Database | None = None,
+) -> AutomationEngine:
+    database = database or Database(path=db_path)
     engine = AutomationEngine(database, audit_path)
     with database.session() as session:
         already_seeded = bool(session.scalar(select(func.count(Organization.id))))
@@ -417,4 +506,5 @@ def seed_demo_data(db_path: Path, audit_path: Path) -> AutomationEngine:
         _seed_ministry(engine)
         _seed_bank(engine)
     _seed_redteam_results(database)
+    seed_inbound_sources(engine)
     return engine

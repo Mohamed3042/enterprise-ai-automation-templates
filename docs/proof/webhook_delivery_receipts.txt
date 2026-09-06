@@ -1,0 +1,23 @@
+Outbound webhook delivery — measured receipts (2026-09-05, Windows 11, Python 3.12.10)
+
+A real HTTP receiver on 127.0.0.1 was scripted to answer 500, 500, 200 to the same
+`run.stage.decided` delivery. Three worker passes later, the stored delivery row reads:
+
+    status=delivered  attempts=3  event=run.stage.decided
+      attempt 1: HTTP 500  3.2 ms  response='synthetic receiver failure'
+      attempt 2: HTTP 500  2.9 ms  response='synthetic receiver failure'
+      attempt 3: HTTP 200  3.0 ms  response='ok'
+
+The same flow is asserted in tests/test_webhooks.py:
+  - test_a_decision_is_delivered_after_500_500_200_with_a_receipt_per_attempt
+    also asserts the receiver could verify every signature with the recipe in docs/webhooks.md.
+  - test_five_failures_dead_letter_the_delivery_and_a_retry_revives_it
+    drives five failures to `dead_letter`, then revives it through
+    POST /api/v1/webhooks/deliveries/{id}/retry.
+  - test_backoff_holds_a_failed_delivery_until_it_is_due
+    proves a second worker pass respects `next_attempt_at` instead of hammering.
+
+Inbound, in the same file: a tampered signature is 401 and starts NO run (the run count is
+measured before and after); a timestamp outside the five-minute tolerance is 401; a replayed
+`X-Idempotency-Key` returns the first result with `idempotent_replay: true`, one inbound_events
+row, and no second run.

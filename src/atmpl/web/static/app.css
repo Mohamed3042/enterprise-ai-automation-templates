@@ -43,3 +43,34 @@ h1, h2, h3, p { margin-top: 0; } h1 { font-family: Georgia, "Times New Roman", s
 footer { background: #0a1f27; color: #9db4af; display: flex; font-size: 11px; justify-content: space-between; padding: 26px max(24px, calc((100vw - 1180px) / 2)); }
 @media (max-width: 900px) { .hero, .approval-body { grid-template-columns: 1fr; }.org-grid, .redteam-grid { grid-template-columns: repeat(2, 1fr); }.invariant-grid { grid-template-columns: repeat(2, 1fr); }.override-grid { grid-template-columns: 1fr; }.override-arrow { min-height: 42px; transform: rotate(90deg); } }
 @media (max-width: 640px) { .topbar { height: auto; padding-bottom: 14px; padding-top: 14px; }.brand small { display: none; } nav { gap: 12px; } nav a { font-size: 11px; }.hero { padding-top: 55px; }.metric-grid { grid-template-columns: repeat(2, 1fr); }.metric-grid article:first-child, .metric-grid article:last-child { border-radius: 0; }.org-grid, .redteam-grid, .invariant-grid { grid-template-columns: 1fr; }.section-heading, .header-row { align-items: start; flex-direction: column; }.approval-meta { align-items: start; flex-wrap: wrap; }.approval-meta a { margin-left: 0; width: 100%; }.stage-heading { flex-direction: column; }.stage-heading > div:last-child { align-self: start; } footer { flex-direction: column; gap: 8px; } }
+
+
+/* --- v0.2.0: identity, demo banner, webhooks table, login ------------------ */
+.identity { display: flex; align-items: center; gap: .75rem; margin-left: auto; }
+.version-badge { font-size: .72rem; letter-spacing: .04em; padding: .2rem .5rem; border-radius: 999px; background: rgba(255,255,255,.12); color: #e6f4f1; }
+.identity .who { font-size: .8rem; color: #cfe6e0; text-decoration: none; }
+.link-button { background: none; border: 1px solid rgba(255,255,255,.3); color: #e6f4f1; border-radius: 6px; padding: .25rem .6rem; font: inherit; font-size: .78rem; cursor: pointer; }
+.demo-banner { background: #fff4d6; color: #4a3a06; padding: .55rem 1rem; text-align: center; font-size: .82rem; border-bottom: 1px solid #e6d29a; }
+.demo-banner code { background: rgba(0,0,0,.06); padding: 0 .25rem; border-radius: 3px; }
+table.selectable tbody tr { cursor: pointer; }
+table.selectable tbody tr:hover { background: #f2f7f6; }
+table.selectable tbody tr.is-selected { background: #e2f1ed; outline: 2px solid #117e6a; outline-offset: -2px; }
+table td.truncate { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.button.small { padding: .3rem .7rem; font-size: .78rem; }
+.muted { color: #6b7c79; }
+.login-shell { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.login-form { display: grid; gap: .9rem; padding: 1.5rem; border: 1px solid #d8e5e2; border-radius: 12px; background: #fff; }
+.login-form label { display: grid; gap: .35rem; font-size: .85rem; }
+.login-form input { padding: .55rem .7rem; border: 1px solid #c6d8d4; border-radius: 8px; font: inherit; }
+.delivery-panel { margin-top: 1rem; }
+@media (max-width: 780px) { .login-shell { grid-template-columns: 1fr; } }
+.evidence.event-panel { border-left: 3px solid #117e6a; }
+.evidence.event-panel .panel-label { color: #117e6a; }
+
+/* The decision panel gained an "Authenticated as" term, which does not fit a 65px column. */
+.decision-panel dl { column-gap: 10px; grid-template-columns: minmax(96px, max-content) 1fr; }
+.decision-panel dt { line-height: 1.35; }
+.topbar .identity { flex: 0 0 auto; }
+.topbar nav { flex: 1 1 auto; }
+.identity .who { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1100px) { .identity .who { display: none; } }

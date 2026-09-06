@@ -75,6 +75,56 @@ def _answer_skeleton(model: type[BaseModel], org: str | None = None) -> dict[str
     return result
 
 
+def question_items(template_name: str) -> list[dict[str, str]]:
+    """The discovery questions for a template, in asking order (API + CLI share this)."""
+    model = placeholder_model(canonical_name(template_name))
+    return [
+        {"placeholder": path, "question": prompt, "type": type_label}
+        for path, (prompt, type_label) in _question_map(model).items()
+    ]
+
+
+def answer_skeleton(template_name: str, organization: str | None = None) -> dict[str, Any]:
+    """A blank, correctly shaped answers document for a template."""
+    return _answer_skeleton(placeholder_model(canonical_name(template_name)), organization)
+
+
+def validate_answers(template_name: str, answers: dict[str, Any]) -> list[dict[str, str]]:
+    """Return the outstanding follow-ups; an empty list means the answers compile."""
+    canonical = canonical_name(template_name)
+    model = placeholder_model(canonical)
+    questions = _question_map(model)
+    try:
+        validated = model.model_validate(answers)
+    except ValidationError as exc:
+        return [
+            {
+                "placeholder": ".".join(str(part) for part in error["loc"]),
+                "question": questions.get(
+                    ".".join(str(part) for part in error["loc"]),
+                    (f"Correct {error['loc']}.", ""),
+                )[0],
+                "problem": error["msg"],
+            }
+            for error in exc.errors()
+        ]
+    if canonical == "retail_refund":
+        regional = validated.model_dump(mode="json")["regional"]
+        expected = EXPECTED_RETAIL_PACKS[regional["region"]]
+        if expected != regional["policy_pack"]:
+            return [
+                {
+                    "placeholder": "regional.policy_pack",
+                    "question": questions["regional.policy_pack"][0],
+                    "problem": (
+                        f"'{regional['policy_pack']}' cannot cross the "
+                        f"{regional['region']} boundary; expected '{expected}'."
+                    ),
+                }
+            ]
+    return []
+
+
 def init_discovery(
     template_name: str,
     org: str,
@@ -162,15 +212,14 @@ def _follow_up_error(items: list[tuple[str, str]]) -> DiscoveryError:
     return DiscoveryError("\n".join(lines))
 
 
-def resolve_discovery(
+def compile_workflow(
     template_name: str,
-    answers_path: Path,
-    output_path: Path | None = None,
+    raw_answers: dict[str, Any],
 ) -> InstantiatedWorkflow:
+    """Validate answers and resolve one base template into an instantiated workflow."""
     canonical = canonical_name(template_name)
     model = placeholder_model(canonical)
     questions = _question_map(model)
-    raw_answers = yaml.safe_load(answers_path.read_text(encoding="utf-8")) or {}
 
     try:
         validated = model.model_validate(raw_answers)
@@ -214,6 +263,17 @@ def resolve_discovery(
             "org_profile": answers,
         }
     )
+    return workflow
+
+
+def resolve_discovery(
+    template_name: str,
+    answers_path: Path,
+    output_path: Path | None = None,
+) -> InstantiatedWorkflow:
+    """File-based entry point used by the CLI and the seeded demos."""
+    raw_answers = yaml.safe_load(answers_path.read_text(encoding="utf-8")) or {}
+    workflow = compile_workflow(template_name, raw_answers)
     if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(

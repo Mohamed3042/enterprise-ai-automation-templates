@@ -1,0 +1,41 @@
+Dependency audit gate — fail-first proof (measured 2026-09-05, Windows 11, Python 3.12.10,
+pip-audit 2.9.0)
+
+The gate: `pip-audit --skip-editable` in CI. The project itself is skipped because it is
+installed editable and is not on PyPI; every third-party dependency is audited.
+
+RED — a scratch requirements file pinning a knowingly vulnerable release:
+
+    $ cat vulnerable-requirements.txt
+    requests==2.19.1
+
+    $ pip-audit -r vulnerable-requirements.txt
+    Found 23 known vulnerabilities in 3 packages
+    Name     Version ID              Fix Versions
+    -------- ------- --------------- -------------
+    requests 2.19.1  PYSEC-2018-28   2.20.0
+    requests 2.19.1  PYSEC-2023-74   2.31.0
+    requests 2.19.1  PYSEC-2026-1873 2.32.0
+    urllib3  1.23    PYSEC-2023-212  1.26.18,2.0.7
+    ...
+    exit code 1
+
+REAL FINDING — the first run against this project's own environment was NOT clean:
+
+    Found 1 known vulnerability in 1 package
+    Name   Version ID              Fix Versions
+    ------ ------- --------------- ------------
+    pytest 8.4.2   PYSEC-2026-1845 9.0.3
+    exit code 1
+
+Fixed by tightening the pin in pyproject.toml from `pytest>=8.3,<9` to `pytest>=9.0.3,<10`
+and re-running the suite on pytest 9.1.1 (121 passed, 1 skipped).
+
+GREEN — after the bump:
+
+    $ pip-audit --skip-editable
+    No known vulnerabilities found
+    Name                               Skip Reason
+    ---------------------------------- -------------------------------
+    enterprise-ai-automation-templates distribution marked as editable
+    exit code 0

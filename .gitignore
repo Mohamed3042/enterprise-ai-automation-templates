@@ -12,3 +12,4 @@ htmlcov/
 var/
 dist/
 build/
+.env

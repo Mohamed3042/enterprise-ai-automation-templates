@@ -10,6 +10,9 @@ REQUIRED_SCREENSHOTS = (
     "pending-approvals.png",
     "audit-verify.png",
     "redteam-results.png",
+    "webhook-started-run.png",
+    "webhook-deliveries.png",
+    "api-docs.png",
 )
 
 
@@ -22,6 +25,46 @@ def test_readme_has_methodology_diagrams_and_single_quickstart():
     assert "What is real vs simulated" in readme
     assert "VERIFIED" in readme
     assert "[INFERRED]" in readme
+
+
+def test_readme_verify_block_names_the_command_and_what_to_look_for():
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "## Verify in two minutes" in readme
+    assert "docker compose up" in readme
+    assert "SEEDED: retail + ministry + bank" in readme
+    assert "24 / 24 attacks blocked" in readme
+    assert "human:demo" in readme, "the demo-mode boundary sentence must be in the README"
+
+
+def test_every_real_decision_has_an_adr_and_the_demo_has_a_runbook():
+    adrs = sorted(path.name for path in (PROJECT_ROOT / "docs" / "adr").glob("*.md"))
+
+    assert adrs == [
+        "0001-api-versioning.md",
+        "0002-auth-model.md",
+        "0003-webhook-outbox.md",
+        "0004-sqlite-and-postgres.md",
+        "0005-secrets-provider.md",
+    ]
+    for name in adrs:
+        text = (PROJECT_ROOT / "docs" / "adr" / name).read_text(encoding="utf-8")
+        assert "## Context" in text and "## Decision" in text and "## Consequences" in text
+    assert (PROJECT_ROOT / "docs" / "demo-runbook.md").exists()
+    assert (PROJECT_ROOT / "docs" / "webhooks.md").exists()
+
+
+def test_env_example_documents_every_setting():
+    from atmpl.settings import Settings
+
+    example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+    undocumented = [
+        f"ATMPL_{name.upper()}"
+        for name in Settings.model_fields
+        if f"ATMPL_{name.upper()}" not in example
+    ]
+
+    assert undocumented == [], f"settings missing from .env.example: {undocumented}"
 
 
 def test_required_live_screenshots_are_valid_png_files():

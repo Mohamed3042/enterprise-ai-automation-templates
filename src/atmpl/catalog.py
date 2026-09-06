@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import yaml
@@ -15,7 +16,24 @@ from atmpl.models import (
     TemplateDocument,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+def _discover_project_root() -> Path:
+    """Find the directory that holds `templates/base`.
+
+    Editable installs put it two levels above this file; a wheel in a container does not, so
+    the image sets ATMPL_PROJECT_ROOT and the search below is the fallback for both.
+    """
+    override = os.getenv("ATMPL_PROJECT_ROOT")
+    if override:
+        return Path(override).resolve()
+    here = Path(__file__).resolve()
+    for candidate in here.parents:
+        if (candidate / "templates" / "base").is_dir():
+            return candidate
+    return here.parents[2]
+
+
+PROJECT_ROOT = _discover_project_root()
 TEMPLATE_ROOT = PROJECT_ROOT / "templates" / "base"
 
 ALIASES = {
