@@ -27,18 +27,21 @@ in the demos are **synthetic and fake**.
 
 ## Verify in two minutes
 
-**A read-only public demo is built and awaiting one Blueprint apply.**
-[`deploy/render/Dockerfile`](deploy/render/Dockerfile) is `FROM` the exact image CI published
-plus the environment a public demo needs, and Render's free plan builds it — read-only,
-keyless, four clicks, no card. See [`deploy/render/`](deploy/render/). Its URL is not claimed
-here until a 200 has been measured on it. The path below is the one that is measured today.
+**Live, read-only public demo: <https://atmpl-governed-automation.onrender.com>** — Render builds
+[`deploy/render/Dockerfile`](deploy/render/Dockerfile), which is `FROM` the exact `v0.3.0` image
+CI published plus the environment a public demo needs. Measured 2026-09-06: `/health` → `200`
+`{"status":"ok","version":"0.3.0","adapter":"mock"}`; `/`, `/approvals`, `/audit`, `/evals`,
+`/llmops`, `/api/v1/docs` and `/metrics` → `200`; every write → `demo_readonly`. It runs on a
+Free instance, which sleeps after ~15 minutes idle — the first request after a pause takes ~30 s.
+See [`deploy/render/`](deploy/render/) for how it was created and how to redeploy it.
 
-*(Two hosted routes were measured and rejected on the same day. A Hugging Face Docker Space
-returns `402 Payment Required` — "hosting Gradio and Docker Spaces on free cpu-basic requires
-a PRO subscription" — after a successful `hf auth login`; and on Render, both applying a
-Blueprint and deploying a prebuilt registry image ask for a card. Building a Dockerfile from
-the repository does not. `deploy/hf-space/` and `render.yaml` are both kept, correct and
-tested, for the day a paid plan makes them the shorter path.)*
+*(Hosting, measured the same day: a Hugging Face Docker Space returns `402 Payment Required` —
+"hosting Gradio and Docker Spaces on free cpu-basic requires a PRO subscription" — after a
+successful `hf auth login`; and Render answers `402 Payment information is required` from
+`POST /v1/services` until a card is on file, Free plan included. With a card on file the Free
+instance costs nothing, and [`deploy/render/create_service.py`](deploy/render/create_service.py)
+created the service through the API. `deploy/hf-space/` and `render.yaml` are kept, correct and
+tested, for a paid plan.)*
 
 From a clean clone — this exact sequence is recorded in
 [`docs/proof/clean_clone_acceptance.txt`](docs/proof/clean_clone_acceptance.txt):

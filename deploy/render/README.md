@@ -4,31 +4,36 @@
 public demo needs and nothing else. Render builds it; the running bytes are still the ones
 that were tested.
 
-## Publishing it (browser, once — no card, no Blueprint)
+## Publishing it
 
-1. <https://dashboard.render.com> → sign in with GitHub.
-2. **New +** → **Web Service**.
-3. **Build and deploy from a Git repository** → `Mohamed3042/enterprise-ai-automation-templates`,
-   branch `main`.
-4. Set exactly three fields, then **Deploy**:
+Render requires payment information on file before it creates **any** service, the Free plan
+included — measured 2026-09-06 as `402 Payment information is required to complete this
+request` from `POST /v1/services`, and the dashboard's Blueprint and registry-image paths asked
+for a card the same day. With a card on file the Free instance costs nothing.
 
-   | Field | Value |
-   |---|---|
-   | Language / Runtime | **Docker** |
-   | Dockerfile Path | `./deploy/render/Dockerfile` |
-   | Instance Type | **Free** |
+Once: <https://dashboard.render.com/billing> → add a card; **Account Settings → API Keys** →
+create a key → `RENDER_API_KEY` in your environment (never in the repository). Then:
 
-   Leave **Environment Variables** empty. Everything the demo needs is in the Dockerfile, so
-   there is no form field to mistype into a deployment that quietly is not read-only.
+```bash
+python deploy/render/create_service.py          # create (or reuse), wait until live, measure /health
+python deploy/render/create_service.py --check  # measure only
+```
 
-The first build pulls a 325 MB base image, so give it a few minutes.
+The script creates `atmpl-governed-automation` as a Docker web service in Frankfurt on the
+Free plan from this repository's `main`, with `/health` as the health check and no environment
+variables — everything the demo needs is in the Dockerfile, so there is no form field to
+mistype into a deployment that quietly is not read-only. The dashboard form works too
+(**New + → Web Service → this repository → Language Docker → Dockerfile Path
+`./deploy/render/Dockerfile` → Instance Type Free**).
+
+The first build pulls a 325 MB base image, so give it a few minutes. Live since 2026-09-06 at
+<https://atmpl-governed-automation.onrender.com>.
 
 ### Why not the Blueprint
 
-`render.yaml` is committed and correct, and **Apply Blueprint asked for a card** on
-2026-09-06 — as did deploying a prebuilt registry image (`runtime: image`). The path above
-avoids both. The Blueprint is kept for whenever a paid plan makes it available; it points at
-the same Dockerfile, so the two cannot drift.
+`render.yaml` is committed and correct; it points at the same Dockerfile, so the two cannot
+drift. Applying it asked for a card before the API path was measured — with a card on file it
+is simply the second way to create the same service.
 
 ## What to expect
 
@@ -58,8 +63,9 @@ docker run -p 8000:8000 ghcr.io/mohamed3042/enterprise-ai-automation-templates:l
 ## Redeploying after a release
 
 The Dockerfile pins a base tag, so a new release is a one-line edit to its `FROM` plus a push;
-Render rebuilds on push to `main`. To let CI force it, add the hook from
-**Settings → Deploy Hook**:
+Render rebuilds on push to `main` when the repository is connected, and
+`python deploy/render/create_service.py --redeploy` forces a deploy through the API from
+anywhere the key is set. To let CI force it, add the hook from **Settings → Deploy Hook**:
 
 ```bash
 gh secret set RENDER_DEPLOY_HOOK -R Mohamed3042/enterprise-ai-automation-templates
