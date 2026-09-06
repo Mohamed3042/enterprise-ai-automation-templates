@@ -9,6 +9,7 @@ Run locally with:  pytest -m e2e     (needs: python -m playwright install chromi
 from __future__ import annotations
 
 import json
+import socket
 import threading
 import time
 from collections.abc import Iterator
@@ -59,10 +60,18 @@ def receiver() -> Iterator[str]:
         server.server_close()
 
 
+def _free_port() -> int:
+    """Never hardcode a port in a test: a leftover server from a previous run owns it."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
 @pytest.fixture(scope="module")
 def live_app(tmp_path_factory, receiver) -> Iterator[dict]:
     """A real uvicorn server, because a browser cannot drive TestClient."""
     root = tmp_path_factory.mktemp("e2e")
+    port = _free_port()
     engine = seed_demo_data(root / "demo.db", root / "audit.jsonl")
     seed_demo_subscription(engine, receiver, RECEIVER_SECRET)
     settings = Settings(
@@ -73,7 +82,7 @@ def live_app(tmp_path_factory, receiver) -> Iterator[dict]:
         rate_limit="0/minute",
     )
     app = create_app(engine, settings)
-    config = uvicorn.Config(app, host="127.0.0.1", port=8765, log_level="warning")
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -83,7 +92,7 @@ def live_app(tmp_path_factory, receiver) -> Iterator[dict]:
     if not server.started:
         raise RuntimeError("uvicorn did not start within 30s")
     try:
-        yield {"url": "http://127.0.0.1:8765", "engine": engine, "app": app}
+        yield {"url": f"http://127.0.0.1:{port}", "engine": engine, "app": app}
     finally:
         server.should_exit = True
         thread.join(timeout=10)
