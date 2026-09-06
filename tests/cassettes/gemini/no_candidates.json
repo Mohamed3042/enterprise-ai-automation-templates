@@ -1,0 +1,9 @@
+{
+  "_note": "Safety-filtered: no candidates. Must map to malformed_response, not IndexError.",
+  "status": 200,
+  "body": {
+    "promptFeedback": {
+      "blockReason": "SAFETY"
+    }
+  }
+}

@@ -36,6 +36,12 @@ services:
       # Used only when the `receiver` profile is up; harmless otherwise.
       ATMPL_DEMO_SUBSCRIBE_URL: http://receiver:8181/hook
       ATMPL_DEMO_SUBSCRIBE_SECRET: whsec_synthetic_compose_receiver
+      # With the `tracing` profile up, this collector exists and every span reaches Jaeger.
+      # Without it, the exporter is set but the endpoint is dead, so keep it `none` here and
+      # switch it on with: docker compose --profile tracing up
+      ATMPL_TRACE_EXPORTER: ${ATMPL_TRACE_EXPORTER:-none}
+      ATMPL_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      ATMPL_JSON_LOGS: "1"
     ports:
       - "8000:8000"
     volumes:
@@ -64,6 +70,21 @@ services:
     command: ["python", "/app/scripts/demo_receiver.py"]
     ports:
       - "8181:8181"
+    restart: unless-stopped
+
+  # `docker compose --profile tracing up` adds an all-in-one Jaeger that speaks OTLP, so a
+  # trace of one governed run is visible in a real UI rather than described in a document.
+  #
+  #   ATMPL_TRACE_EXPORTER=otlp docker compose --profile tracing up --build
+  #   open http://127.0.0.1:16686  ->  service `atmpl`  ->  operation `atmpl.run`
+  jaeger:
+    profiles: ["tracing"]
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # the UI
+      - "4318:4318"     # OTLP over HTTP, which is what the exporter speaks
     restart: unless-stopped
 
 volumes:

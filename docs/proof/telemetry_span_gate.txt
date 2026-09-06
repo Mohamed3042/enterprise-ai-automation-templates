@@ -1,0 +1,34 @@
+GATE: the span tree of one governed run
+=======================================
+
+Recorded 2026-09-06T12:27:31+00:00 on Windows 11, Python 3.12.10, from the tree this release was cut from.
+
+WHAT WAS REMOVED
+----------------
+src/atmpl/engine/service.py — the postflight's `guardrail_span(phase="postflight")`
+swapped for `stage_span(stage_key=stage_key)`. The guardrail still runs and a blocked
+stage is still blocked; only the trace stops calling that node a guardrail. A check that
+counted spans would not notice, because the count is unchanged at five. The one that
+asserts the shape reports exactly where it changed.
+
+RED — with the fix removed
+--------------------------
+            (1, SPAN_STAGE),
+            (2, SPAN_GUARDRAIL),
+            (2, SPAN_LLM_CALL),
+            (2, SPAN_GUARDRAIL),
+        ]
+E       AssertionError: assert [(0, 'atmpl.r...atmpl.stage')] == [(0, 'atmpl.r...l.guardrail')]
+E         
+E         At index 4 diff: (2, 'atmpl.stage') != (2, 'atmpl.guardrail')
+E         Use -v to get more diff
+
+tests\test_telemetry.py:86: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_telemetry.py::test_one_ai_stage_emits_the_whole_span_tree
+1 failed in 0.63s
+
+GREEN — with the fix in place
+-----------------------------
+.                                                                        [100%]
+1 passed in 0.45s

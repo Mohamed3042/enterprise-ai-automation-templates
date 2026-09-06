@@ -1,0 +1,32 @@
+{
+  "_note": "Authored from https://platform.openai.com/docs/api-reference/chat. Synthetic.",
+  "_request": {
+    "method": "POST",
+    "url": "https://api.openai.com/v1/chat/completions",
+    "headers": {
+      "authorization": "Bearer <redacted>",
+      "content-type": "application/json"
+    }
+  },
+  "status": 200,
+  "body": {
+    "id": "chatcmpl-synthetic-cassette-ok",
+    "object": "chat.completion",
+    "model": "gpt-4o-mini",
+    "choices": [
+      {
+        "index": 0,
+        "finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "{\"summary\": \"Synthetic request classified for governed human review.\", \"recommendation\": \"REVIEW\", \"confidence\": 0.88}"
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 871,
+      "completion_tokens": 58,
+      "total_tokens": 929
+    }
+  }
+}

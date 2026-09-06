@@ -24,7 +24,7 @@ def test_health_and_ready(client):
     ready = client.get("/api/v1/ready")
 
     assert health.status_code == 200
-    assert health.json() == {"status": "ok", "version": "0.2.0", "adapter": "mock"}
+    assert health.json() == {"status": "ok", "version": "0.3.0", "adapter": "mock"}
     assert ready.status_code == 200
     assert ready.json()["database"] == "reachable"
 
@@ -253,7 +253,7 @@ def test_openapi_document_is_served_with_docs(client):
     docs = client.get("/api/v1/docs")
 
     assert schema.status_code == 200
-    assert schema.json()["info"]["version"] == "0.2.0"
+    assert schema.json()["info"]["version"] == "0.3.0"
     assert docs.status_code == 200
     assert "swagger" in docs.text.lower()
 
@@ -276,6 +276,7 @@ def test_every_documented_path_is_reachable(client):
         "/oauth/token",
         "/templates",
         "/templates/{key}",
+        "/discovery/agent",
         "/discovery/sessions",
         "/discovery/sessions/{session_id}",
         "/discovery/sessions/{session_id}/answers",

@@ -9,7 +9,8 @@ REQUIRED_SCREENSHOTS = (
     "ministry-arabic.png",
     "pending-approvals.png",
     "audit-verify.png",
-    "redteam-results.png",
+    "evals-report.png",
+    "llmops-page.png",
     "webhook-started-run.png",
     "webhook-deliveries.png",
     "api-docs.png",
@@ -33,7 +34,7 @@ def test_readme_verify_block_names_the_command_and_what_to_look_for():
     assert "## Verify in two minutes" in readme
     assert "docker compose up" in readme
     assert "SEEDED: retail + ministry + bank" in readme
-    assert "24 / 24 attacks blocked" in readme
+    assert "61 scored cases" in readme, "the eval claim is the one a reader checks"
     assert "human:demo" in readme, "the demo-mode boundary sentence must be in the README"
 
 
@@ -46,12 +47,19 @@ def test_every_real_decision_has_an_adr_and_the_demo_has_a_runbook():
         "0003-webhook-outbox.md",
         "0004-sqlite-and-postgres.md",
         "0005-secrets-provider.md",
+        "0006-telemetry.md",
+        "0007-provider-router.md",
+        "0008-pydanticai-discovery-agent.md",
+        "0009-evals-as-ci-gate.md",
+        "0010-kubernetes-and-space.md",
     ]
     for name in adrs:
         text = (PROJECT_ROOT / "docs" / "adr" / name).read_text(encoding="utf-8")
         assert "## Context" in text and "## Decision" in text and "## Consequences" in text
     assert (PROJECT_ROOT / "docs" / "demo-runbook.md").exists()
     assert (PROJECT_ROOT / "docs" / "webhooks.md").exists()
+    assert (PROJECT_ROOT / "docs" / "evals.md").exists()
+    assert (PROJECT_ROOT / "docs" / "deploy-k8s.md").exists()
 
 
 def test_env_example_documents_every_setting():

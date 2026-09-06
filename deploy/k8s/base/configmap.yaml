@@ -1,0 +1,24 @@
+# Non-secret configuration, mirroring the keys documented in `.env.example`.
+# Anything that must not appear in `kubectl get -o yaml` belongs in `secret.yaml` instead.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atmpl-config
+data:
+  ATMPL_ADAPTER: "mock"
+  ATMPL_PROVIDER_FALLBACKS: ""
+  ATMPL_AUTO_CREATE_SCHEMA: "false"
+  ATMPL_SECRETS_BACKEND: "env"
+  ATMPL_RATE_LIMIT: "240/minute"
+  ATMPL_MAX_BODY_BYTES: "1048576"
+  ATMPL_HSTS_ENABLED: "1"
+  ATMPL_DEMO_OPEN_API: "0"
+  ATMPL_DEMO_READONLY: "0"
+  ATMPL_WEBHOOK_WORKER: "1"
+  ATMPL_TRACE_EXPORTER: "none"
+  ATMPL_OTLP_ENDPOINT: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
+  ATMPL_SERVICE_NAME: "atmpl"
+  ATMPL_METRICS_ENABLED: "1"
+  # Open inside the cluster; the NetworkPolicy is what keeps /metrics off the internet.
+  ATMPL_METRICS_PUBLIC: "1"
+  ATMPL_JSON_LOGS: "1"

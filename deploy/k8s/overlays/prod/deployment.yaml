@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atmpl
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: atmpl
+          # A server does not create its own schema: `atmpl db upgrade` runs first, in an
+          # init container, so two replicas cannot race to build the same tables.
+          command: ["python", "-m", "atmpl", "demo", "up", "--host", "0.0.0.0", "--port", "8000", "--no-open-api"]
+          env:
+            - name: ATMPL_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atmpl-database
+                  key: url
+      initContainers:
+        - name: migrate
+          image: ghcr.io/mohamed3042/enterprise-ai-automation-templates:latest
+          command: ["python", "-m", "atmpl", "db", "upgrade"]
+          env:
+            - name: ATMPL_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atmpl-database
+                  key: url
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

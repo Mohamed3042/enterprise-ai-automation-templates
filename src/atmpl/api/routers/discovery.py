@@ -10,14 +10,18 @@ import re
 
 from fastapi import APIRouter, Body, Depends, Path, Request
 
+from atmpl.agents.discovery import AgentRefused, run_discovery
 from atmpl.api.errors import ApiError
 from atmpl.api.schemas import (
     AnswersUpdate,
     AnswersValidation,
+    DiscoveryAgentOut,
+    DiscoveryAgentRequest,
     DiscoverySessionCreate,
     DiscoverySessionOut,
     FollowUpOut,
     QuestionOut,
+    RationaleOut,
     ResolvedWorkflowOut,
     ResolveRequest,
 )
@@ -180,4 +184,67 @@ async def resolve_session(
         stage_count=len(workflow.stages),
         org_profile=workflow.org_profile,
         workflow=workflow.model_dump(mode="json"),
+    )
+
+
+@router.post(
+    "/discovery/agent",
+    response_model=DiscoveryAgentOut,
+    status_code=201,
+    summary="Draft a questionnaire from a free-text process description",
+    description=(
+        "Runs the PydanticAI discovery agent on the provider this deployment is configured "
+        "with. Its answer is validated against the template's own placeholder model before "
+        "it is returned: a field the template does not declare, a value of the wrong type, "
+        "or a policy pack that crosses its region all fail closed with `discovery_incomplete` "
+        "and the offending field. The result is a DRAFT — no organization, workflow or run is "
+        "created, and no decision is made."
+    ),
+    dependencies=[Depends(require_scope(Scope.DISCOVERY_WRITE))],
+)
+def discovery_agent(
+    request: Request,
+    body: DiscoveryAgentRequest = Body(),
+) -> DiscoveryAgentOut:
+    # Deliberately synchronous. The agent loop is driven by `Agent.run_sync`, which starts
+    # its own event loop; calling it from an `async def` handler raises "This event loop is
+    # already running". A sync handler is dispatched to FastAPI's threadpool, which is also
+    # where a call that can take half a minute belongs.
+    context = context_of(request)
+    try:
+        result = run_discovery(
+            context.router,
+            description=body.description,
+            template=body.template,
+            organization=body.organization,
+        )
+    except AgentRefused as exc:
+        raise ApiError(
+            422,
+            "discovery_incomplete",
+            str(exc),
+            details={"follow_ups": exc.follow_ups},
+        ) from exc
+
+    session_id: str | None = None
+    if body.open_session:
+        with context.engine.database.session() as session:
+            record = DiscoverySession(
+                template=result.template,
+                organization=result.organization,
+                answers=result.answers,
+            )
+            session.add(record)
+            session.commit()
+            session_id = record.id
+
+    return DiscoveryAgentOut(
+        session_id=session_id,
+        template=result.template,
+        organization=result.organization,
+        answers=result.answers,
+        rationales=[RationaleOut(**item) for item in result.rationales],
+        open_questions=result.open_questions,
+        provider=result.provider,
+        model=result.model,
     )

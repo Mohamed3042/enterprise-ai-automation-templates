@@ -1,0 +1,26 @@
+GATE: the Kubernetes security posture
+=====================================
+
+Recorded 2026-09-06T12:27:43+00:00 on Windows 11, Python 3.12.10, from the tree this release was cut from.
+
+WHAT WAS REMOVED
+----------------
+deploy/k8s/base/deployment.yaml — `readOnlyRootFilesystem` flipped to false.
+
+RED — with the fix removed
+--------------------------
+        security = container["securityContext"]
+    
+        assert security["allowPrivilegeEscalation"] is False
+>       assert security["readOnlyRootFilesystem"] is True
+E       assert False is True
+
+tests\test_deploy.py:44: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_deploy.py::test_the_container_drops_every_capability_and_cannot_escalate
+1 failed, 14 passed in 0.73s
+
+GREEN — with the fix in place
+-----------------------------
+...............                                                          [100%]
+15 passed in 0.56s

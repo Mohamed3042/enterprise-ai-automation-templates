@@ -64,3 +64,22 @@ def test_ministry_seed_is_utf8_bilingual(seeded_engine):
     assert "خطة درس الرياضيات" in run.title
     assert submit.input_data["subject_en"] == "Mathematics"
     assert submit.input_data["subject_ar"] == "الرياضيات"
+
+
+def test_seeding_and_exercising_write_only_under_var(tmp_path, monkeypatch):
+    """A read-only root filesystem is the Kubernetes default this repository ships.
+
+    `/app/var` is the one writable mount, so the whole start-up path — migrate, seed, run the
+    red team, exercise one AI stage per demo — must touch nothing else in the working
+    directory. Two pod crash-loops in CI were caused by code that did.
+    """
+    from atmpl.demos import exercise_demos, seed_demo_data
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "var").mkdir()
+
+    engine = seed_demo_data(tmp_path / "var" / "demo.db", tmp_path / "var" / "audit.jsonl")
+    outcomes = exercise_demos(engine)
+
+    assert [entry.get("status") for entry in outcomes] == ["draft_ready"] * 3
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["var"]

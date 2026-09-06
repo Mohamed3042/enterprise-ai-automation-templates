@@ -1,0 +1,32 @@
+{
+  "_note": "Malformed tool arguments; must map to malformed_response, not JSONDecodeError.",
+  "status": 200,
+  "body": {
+    "id": "chatcmpl-synthetic-cassette-badargs",
+    "model": "gpt-4o-mini",
+    "choices": [
+      {
+        "index": 0,
+        "finish_reason": "tool_calls",
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_bad",
+              "type": "function",
+              "function": {
+                "name": "list_required_fields",
+                "arguments": "{\"template\": "
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 402,
+      "completion_tokens": 8
+    }
+  }
+}

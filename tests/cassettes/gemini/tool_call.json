@@ -1,0 +1,28 @@
+{
+  "_note": "A function call rather than text: the shape the agent's tool loop reads.",
+  "status": 200,
+  "body": {
+    "candidates": [
+      {
+        "finishReason": "STOP",
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "functionCall": {
+                "name": "list_required_fields",
+                "args": {
+                  "template": "retail_refund"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 402,
+      "candidatesTokenCount": 12
+    }
+  }
+}

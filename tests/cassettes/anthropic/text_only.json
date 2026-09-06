@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "body": {
+    "id": "msg_synthetic_cassette_text",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "content": [
+      {
+        "type": "text",
+        "text": "I cannot make that decision; a human approver must."
+      }
+    ],
+    "usage": {
+      "input_tokens": 402,
+      "output_tokens": 15
+    }
+  }
+}

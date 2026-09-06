@@ -10,7 +10,7 @@ def test_dashboard_pages_render_live_seeded_data(client):
         "/runs/run_ministry_ar_math": "خطة درس الرياضيات",
         "/approvals": "Pending approvals",
         "/audit": "CHAIN VERIFIED",
-        "/redteam": "24 / 24 attacks blocked",
+        "/evals": "R1–R8, as executed in this deployment",
     }
     for path, expected in expectations.items():
         response = client.get(path)

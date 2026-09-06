@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}LLMOps{% endblock %}
+{% block content %}
+<section class="page-header page-shell">
+  <p class="eyebrow">EVERY MODEL CALL THIS PROCESS MADE</p>
+  <div class="header-row">
+    <div>
+      <h1>LLMOps</h1>
+      <p>
+        Fed by the same events the traces and <code>/metrics</code> are fed by. Nothing here is
+        sampled, seeded or projected: if this process has not called a model, the tables are empty
+        and say so.
+      </p>
+    </div>
+    <span class="queue-count">
+      {{ totals.calls }} call{{ "" if totals.calls == 1 else "s" }} ·
+      {{ totals.errors }} error{{ "" if totals.errors == 1 else "s" }} ·
+      {{ totals.guardrail_trips }} guardrail trip{{ "" if totals.guardrail_trips == 1 else "s" }}
+    </span>
+  </div>
+</section>
+
+<section class="metric-grid page-shell" aria-label="Model call totals">
+  <article><strong>{{ totals.calls }}</strong><span>model calls (this process)</span></article>
+  <article><strong>{{ totals.tokens_in }}</strong><span>tokens in</span></article>
+  <article><strong>{{ totals.tokens_out }}</strong><span>tokens out</span></article>
+  <article>
+    <strong>{% if totals.priced_calls %}${{ "%.6f"|format(totals.cost_estimate_usd) }}{% else %}not priced{% endif %}</strong>
+    <span>estimated cost</span>
+  </article>
+</section>
+
+<section class="section page-shell" id="providers-table">
+  <div class="section-heading">
+    <div><p class="eyebrow">PER PROVIDER AND MODEL</p><h2>What each model actually did</h2></div>
+    <p>
+      Latency percentiles are over this process's calls. Cost is an <strong>estimate</strong> from
+      the committed price table dated {{ prices.as_of }}{% if prices.valid_through %}, valid through
+      {{ prices.valid_through }}{% endif %} — never a billing figure.
+    </p>
+  </div>
+  <div class="table-wrap">
+    <table class="selectable" data-selectable>
+      <thead>
+        <tr>
+          <th>Provider</th><th>Model</th><th>Calls</th><th>p50</th><th>p95</th>
+          <th>Tokens in</th><th>Tokens out</th><th>Estimated cost</th>
+          <th>Guardrail trips</th><th>Error rate</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in summaries %}
+        <tr tabindex="0">
+          <td><code>{{ row.provider }}</code></td>
+          <td>{{ row.model }}</td>
+          <td>{{ row.calls }}</td>
+          <td>{{ "%.0f ms"|format(row.p50_ms) }}</td>
+          <td>{{ "%.0f ms"|format(row.p95_ms) }}</td>
+          <td>{{ row.tokens_in }}</td>
+          <td>{{ row.tokens_out }}</td>
+          <td>
+            {% if row.cost_measured_calls %}${{ "%.6f"|format(row.cost_estimate_usd) }}
+            <span class="muted">estimated</span>
+            {% else %}<span class="muted">not priced</span>{% endif %}
+          </td>
+          <td>{{ row.guardrail_trips }}</td>
+          <td>{{ "%.1f%%"|format(row.error_rate * 100) }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="10" class="muted">No model calls yet in this process. Start a run from <a href="/approvals">Approvals</a>, or run <code>python -m atmpl discover --text "…"</code>.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section page-shell" id="template-rollup">
+  <div class="section-heading">
+    <div><p class="eyebrow">PER TEMPLATE</p><h2>Approvals against blocks</h2></div>
+    <p>Read from the database, not from this process's memory: these survive a restart.</p>
+  </div>
+  <div class="table-wrap">
+    <table class="selectable" data-selectable>
+      <thead>
+        <tr><th>Template</th><th>Runs</th><th>Approved stages</th><th>Rejected</th><th>Blocked</th><th>Open human gates</th></tr>
+      </thead>
+      <tbody>
+      {% for row in templates %}
+        <tr tabindex="0">
+          <td><code>{{ row.template }}</code></td>
+          <td>{{ row.runs }}</td>
+          <td>{{ row.approved }}</td>
+          <td>{{ row.rejected }}</td>
+          <td>{{ row.blocked }}</td>
+          <td>{{ row.pending }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="muted">No runs exist yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section page-shell" id="span-tree">
+  <div class="section-heading">
+    <div><p class="eyebrow">THE LAST FEW TRACES</p><h2>Span tree</h2></div>
+    <p>
+      Exporter: <code>{{ exporter }}</code>{% if exporter == "none" %} — spans are kept in this
+      process only. Set <code>ATMPL_TRACE_EXPORTER=otlp</code> to ship them to a collector.{% endif %}
+    </p>
+  </div>
+  {% for trace in traces %}
+  <div class="verification">
+    <p><strong>{{ trace.root }}</strong> · <code>{{ trace.trace_id }}</code> ·
+      {{ trace.span_count }} span{{ "" if trace.span_count == 1 else "s" }} ·
+      {{ "%.1f ms"|format(trace.duration_ms) }}</p>
+    <ul class="timeline">
+      {% for span in trace.spans %}
+      <li style="margin-left: {{ span.depth * 18 }}px">
+        <code>{{ span.name }}</code>
+        <span class="muted">{{ "%.1f ms"|format(span.duration_ms) }}</span>
+        {% if span.attributes.get("atmpl.guardrail.decision") %}
+          <span class="status {{ 'dead_letter' if span.attributes.get('atmpl.guardrail.decision') == 'blocked' else 'delivered' }}">{{ span.attributes.get("atmpl.guardrail.decision") }}</span>
+        {% endif %}
+        {% if span.attributes.get("atmpl.provider") %}
+          <span class="muted">{{ span.attributes.get("atmpl.provider") }}/{{ span.attributes.get("atmpl.model") }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% else %}
+  <p class="muted">No spans recorded yet in this process.</p>
+  {% endfor %}
+</section>
+
+<section class="section page-shell" id="call-log">
+  <div class="section-heading">
+    <div><p class="eyebrow">MOST RECENT FIRST</p><h2>Call log</h2></div>
+    <p>The last {{ recent|length }} of {{ totals.calls }} call{{ "" if totals.calls == 1 else "s" }} this process made.</p>
+  </div>
+  <div class="table-wrap">
+    <table class="selectable" data-selectable>
+      <thead>
+        <tr><th>When</th><th>Provider</th><th>Purpose</th><th>Run</th><th>Stage</th><th>Latency</th><th>Tokens</th><th>Cost</th><th>Guardrail</th><th>Outcome</th></tr>
+      </thead>
+      <tbody>
+      {% for call in recent %}
+        <tr tabindex="0">
+          <td>{{ call.started_at.strftime("%H:%M:%S") }}</td>
+          <td><code>{{ call.provider }}</code></td>
+          <td>{{ call.purpose }}</td>
+          <td class="truncate">{{ call.run_id or "—" }}</td>
+          <td>{{ call.stage_key or "—" }}</td>
+          <td>{{ "%.0f ms"|format(call.latency_ms) }}</td>
+          <td>{% if call.tokens_in is none and call.tokens_out is none %}<span class="muted">not reported</span>{% else %}{{ call.tokens_in or 0 }} / {{ call.tokens_out or 0 }}{% endif %}</td>
+          <td>{% if call.cost_estimate_usd is none %}<span class="muted">not priced</span>{% else %}${{ "%.6f"|format(call.cost_estimate_usd) }}{% endif %}</td>
+          <td>{% if call.guardrail_decision == "not_evaluated" %}<span class="muted">—</span>{% else %}<span class="status {{ 'dead_letter' if call.guardrail_decision == 'blocked' else 'delivered' }}">{{ call.guardrail_decision }}</span>{% endif %}</td>
+          <td><span class="status {{ 'delivered' if call.outcome == 'ok' else 'dead_letter' }}">{{ call.outcome }}{% if call.error_kind %} · {{ call.error_kind }}{% endif %}</span></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="10" class="muted">No model calls yet in this process.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section page-shell" id="provider-chain">
+  <div class="section-heading">
+    <div><p class="eyebrow">CONFIGURED CHAIN</p><h2>Providers</h2></div>
+    <p>A caller never chooses one of these — the deployment does (invariant <strong>G7</strong>).</p>
+  </div>
+  <div class="table-wrap">
+    <table class="selectable" data-selectable>
+      <thead><tr><th>Role</th><th>Provider</th><th>Model</th><th>Configured</th><th>Circuit breaker</th><th>Priced</th></tr></thead>
+      <tbody>
+      {% for row in providers %}
+        <tr tabindex="0">
+          <td>{{ row.role }}</td>
+          <td><code>{{ row.name }}</code></td>
+          <td>{{ row.model }}</td>
+          <td>{{ "yes" if row.configured else "no key" }}</td>
+          <td>{{ row.breaker }}</td>
+          <td>{{ "yes" if prices.knows(row.name, row.model) else "no" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

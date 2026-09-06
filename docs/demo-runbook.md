@@ -6,6 +6,10 @@ What to open, what to click, what the audience sees, and the sentence that keeps
 is real is the machinery: the rules, the ledger, and the fact that the AI cannot be the one who
 decides."*
 
+**Nothing to install:** <https://huggingface.co/spaces/Medo4334/atmpl-governed-automation>
+is this same image, read-only. Every page below is there; the two steps that change state
+(§4 and §6) need a local copy, and the Space says so in a banner.
+
 ## Before the room
 
 ```bash
@@ -52,11 +56,41 @@ Then open the run: the signed decision panel now names the actor, the role, the 
 **Authenticated as**, which is the identity the session actually carried, not just what was
 typed. That is the line that turns "we log approvals" into "we can prove who approved".
 
-## 5. The evidence holds (45 seconds) — `/audit`
+## 5. The evidence holds (40 seconds) — `/audit`
 
 Click **Verify chain**. Every JSONL record embeds the previous hash; verification recomputes
 the whole chain and reports the count. Say: change one historical byte and this goes red — case
-R5 of the red team does exactly that, and `/redteam` shows all 24 attacks blocked.
+R5 does exactly that.
+
+## 5b. And the claim is scored (40 seconds) — `/evals`
+
+The 24 red-team contracts are still here, and they are now 24 of **61 scored cases** with an
+expected decision recorded beside each one. Point at two things:
+
+- the **gated pass rate**, and that `atmpl evals gate --min-pass 1.0` is a CI step, so a
+  regression fails the build rather than changing a page;
+- the cases whose expected decision is **allowed**. Say: a filter that refuses everything
+  passes every attack, so the suite measures the false-positive side too — and two of those
+  cases exist to record where the deterministic filter *ends*, which is in `docs/evals.md`
+  rather than in a footnote nobody reads.
+
+## 5c. Every model call, measured (45 seconds) — `/llmops`
+
+Per provider and model: calls, p50/p95, tokens in and out, estimated cost, guardrail trips,
+error rate. Then the span tree of one real run — `atmpl.run → atmpl.stage → guardrail,
+llm.call, guardrail` — and the call log underneath.
+
+Three sentences worth saying here:
+
+1. **Nothing on this page is sampled or seeded.** A fresh process shows "no model calls yet"
+   and means it; these rows are calls this container made.
+2. **Cost is an estimate**, from a committed price table with the date it was read on it. A
+   model the table does not know reads *not priced* — never `$0.00`.
+3. **The provider is chosen by the deployment, never by the caller.** That is invariant G7,
+   and the providers table at the bottom of the page is the whole configured chain.
+
+If a collector is running (`docker compose --profile tracing up`), the same trace is in Jaeger
+at `http://127.0.0.1:16686` — service `atmpl`, operation `atmpl.run`.
 
 ## 6. It has an outside (60 seconds) — `/webhooks`
 
@@ -84,6 +118,27 @@ code, latency, attempts. `docker compose logs receiver` shows the receiver verif
 signature on the other side. If a receiver fails, the row retries with backoff and ends in
 `dead_letter` with a **Retry delivery** button.
 
+## 6b. It can do the discovery interview (45 seconds) — terminal
+
+```bash
+python -m atmpl discover --text "A European retail chain handles about 4,000 refund requests \
+a month. A store manager approves refunds up to 250 EUR; the regional director approves \
+anything above and owns escalations. Order records are confidential."
+```
+
+Out comes the template's typed questionnaire, filled in, with a reason and a
+`stated | inferred` confidence per field — plus the open questions it declined to guess.
+
+Then say the two things that make it a *governed* agent rather than a demo of an agent:
+
+- it answers **only** the fields the template declares; an invented field is refused with a
+  422 naming it, not merged;
+- it decides nothing. The output is a draft a human edits and then compiles with `resolve`.
+
+`POST /api/v1/discovery/agent` is the same thing over HTTP. On the mock provider it is
+deterministic; live on `gemini-3.6-flash` it took three attempts across 58 seconds, one of
+them a retried 5xx — which is on `/llmops` too.
+
 ## 7. It is an API, not a screen (30 seconds) — `/api/v1/docs`
 
 Every screen you just used is a route here: templates, discovery sessions, runs, decisions,
@@ -95,7 +150,10 @@ schema in front of them is compared against a committed snapshot in CI, so it ca
 
 | Question | Answer |
 |---|---|
-| "Is this using a real model?" | Not by default. The mock adapter is deterministic and offline; a real adapter is explicit and key-gated (G7). |
+| "Is this using a real model?" | Not by default. The mock provider is deterministic and offline. Gemini is live-verified in CI; the Anthropic and OpenAI-compatible adapters are contract-tested against recorded responses, because no key for either exists on the build machine. |
+| "How much does a run cost?" | `/llmops` shows an estimate from a committed price table with a date on it. It is not a billing figure, and a model the table does not know reads *not priced*. |
+| "What happens when the provider is down?" | Retries with backoff on retryable errors, then the next provider in the configured chain, then a circuit breaker that stops trying for a cooldown. Every attempt is a row on `/llmops`. |
+| "Does the agent decide anything?" | No. It drafts a questionnaire, with a reason per field, and a human compiles it. It cannot even add a field the template does not declare. |
 | "Could someone bypass the human?" | Not through this code. There is one HIGH transition and it takes a signed decision; R2 in the red team asserts no other input path exists. |
 | "Is the data real?" | No. Every organization, person and record is invented, and every page says so. |
 | "Is it compliant?" | No claim is made. It demonstrates the engineering controls a compliance programme would map policy onto. |
@@ -104,5 +162,5 @@ schema in front of them is compared against a committed snapshot in CI, so it ca
 ## Tear down
 
 ```bash
-docker compose --profile receiver down -v
+docker compose --profile receiver --profile tracing down -v
 ```

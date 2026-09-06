@@ -1,0 +1,30 @@
+GATE: the discovery agent may not widen the questionnaire
+=========================================================
+
+Recorded 2026-09-06T12:27:51+00:00 on Windows 11, Python 3.12.10, from the tree this release was cut from.
+
+WHAT WAS REMOVED
+----------------
+src/atmpl/agents/discovery.py — `check_rationales` no longer compares the answered
+placeholders against the ones the template declares, so an invented field would be
+merged into the answers document instead of refused.
+
+RED — with the fix removed
+--------------------------
+================================== FAILURES ===================================
+___________ test_a_reason_for_a_field_the_template_lacks_is_refused ___________
+
+    def test_a_reason_for_a_field_the_template_lacks_is_refused():
+>       with pytest.raises(AgentRefused) as caught:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE AgentRefused
+
+tests\test_agents.py:135: Failed
+=========================== short test summary info ===========================
+FAILED tests/test_agents.py::test_a_reason_for_a_field_the_template_lacks_is_refused
+1 failed in 0.19s
+
+GREEN — with the fix in place
+-----------------------------
+.                                                                        [100%]
+1 passed in 0.02s

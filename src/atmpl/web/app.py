@@ -17,7 +17,7 @@ from typing import Any
 
 from fastapi import FastAPI, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
@@ -26,7 +26,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from atmpl import __version__
 from atmpl.api import API_PREFIX, create_api
-from atmpl.api.errors import ApiError, install_error_handlers
+from atmpl.api.errors import ApiError, envelope, install_error_handlers
 from atmpl.audit import verify_audit
 from atmpl.engine.database import (
     AuditEvent,
@@ -39,6 +39,7 @@ from atmpl.engine.database import (
     WebhookSubscription,
 )
 from atmpl.engine.service import AutomationEngine
+from atmpl.evals.runner import latest_report
 from atmpl.guardrails.constants import G2_HIGH_REQUIRES_SIGNED_HUMAN, INVARIANTS
 from atmpl.guardrails.decisions import GuardrailRejection
 from atmpl.models import SignedHumanDecision
@@ -54,6 +55,10 @@ from atmpl.security.middleware import (
 from atmpl.security.principals import Scope
 from atmpl.security.tokens import SessionData, TokenError, read_session, sign_session
 from atmpl.settings import Settings, settings_from_env
+from atmpl.telemetry import build_observability, instrument_app
+from atmpl.telemetry.metrics import CONTENT_TYPE
+from atmpl.telemetry.middleware import MetricsMiddleware
+from atmpl.web.llmops import llmops_view
 from atmpl.webhooks.outbox import deliver_pending, record_event, retry_delivery
 
 WEB_ROOT = Path(__file__).resolve().parent
@@ -100,9 +105,15 @@ def _check_csrf(request: Request, context: AppContext, submitted: str | None) ->
         raise ApiError(403, "csrf_failed", "The form CSRF token is missing or stale.")
 
 
-def create_app(engine: AutomationEngine, settings: Settings | None = None) -> FastAPI:
+def create_app(
+    engine: AutomationEngine,
+    settings: Settings | None = None,
+    *,
+    observability=None,
+) -> FastAPI:
     settings = settings or settings_from_env()
-    context = build_context(engine, settings)
+    observability = observability or build_observability(settings)
+    context = build_context(engine, settings, observability=observability)
     engine.event_sink = record_event
 
     @contextlib.asynccontextmanager
@@ -128,7 +139,11 @@ def create_app(engine: AutomationEngine, settings: Settings | None = None) -> Fa
     app.state.context = context
     install_error_handlers(app)
 
+    instrument_app(app, observability.telemetry, db_engine=engine.database.engine)
+
     app.add_middleware(SecurityHeadersMiddleware, context=context)
+    if settings.metrics_enabled:
+        app.add_middleware(MetricsMiddleware, observability=observability)
     app.add_middleware(RateLimitMiddleware, context=context)
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
     app.add_middleware(RequestIdMiddleware)
@@ -144,6 +159,18 @@ def create_app(engine: AutomationEngine, settings: Settings | None = None) -> Fa
     app.mount(API_PREFIX, create_api(context))
     app.mount("/static", StaticFiles(directory=WEB_ROOT / "static"), name="static")
 
+    @app.middleware("http")
+    async def _readonly_guard(request: Request, call_next):
+        """A hosted demo may be read: it may not be changed, and it never spends a key."""
+        if settings.demo_readonly and request.method not in {"GET", "HEAD", "OPTIONS"}:
+            return envelope(
+                403,
+                "demo_readonly",
+                "This is a read-only public demo. Run it locally to make decisions: "
+                "https://github.com/Mohamed3042/enterprise-ai-automation-templates",
+            )
+        return await call_next(request)
+
     def render(request: Request, name: str, context_data: dict[str, Any], **kwargs: Any):
         principal = session_principal(request)
         return templates.TemplateResponse(
@@ -153,6 +180,7 @@ def create_app(engine: AutomationEngine, settings: Settings | None = None) -> Fa
                 "settings": settings,
                 "principal": principal,
                 "demo_mode": settings.demo_mode,
+                "demo_readonly": settings.demo_readonly,
                 "csrf_token": _csrf_token(request, context),
                 "app_version": __version__,
                 **context_data,
@@ -477,13 +505,59 @@ def create_app(engine: AutomationEngine, settings: Settings | None = None) -> Fa
             {"verification": verify_audit(engine.audit.path)},
         )
 
-    @app.get("/redteam", response_class=HTMLResponse)
-    async def redteam_results(request: Request) -> HTMLResponse:
+    @app.get("/evals", response_class=HTMLResponse)
+    async def evals_page(request: Request) -> HTMLResponse:
         with engine.database.session() as session:
             results = session.scalars(
                 select(RedTeamResult).order_by(RedTeamResult.case_id, RedTeamResult.demo)
             ).all()
-        return render(request, "redteam.html", {"results": results})
+        return render(
+            request,
+            "evals.html",
+            {"results": results, "report": latest_report()},
+        )
+
+    @app.get("/redteam", include_in_schema=False)
+    async def redteam_results(request: Request):
+        """v0.2's URL. The page grew a scored report and moved to /evals."""
+        return RedirectResponse("/evals", status_code=308)
+
+    @app.get("/llmops", response_class=HTMLResponse)
+    async def llmops_page(request: Request) -> HTMLResponse:
+        return render(request, "llmops.html", llmops_view(context))
+
+    @app.get("/health", include_in_schema=False)
+    async def root_health() -> JSONResponse:
+        """Root alias of `/api/v1/health`, so a Kubernetes probe needs no API prefix."""
+        return JSONResponse(
+            {"status": "ok", "version": __version__, "adapter": settings.adapter}
+        )
+
+    @app.get("/ready", include_in_schema=False)
+    async def root_ready() -> JSONResponse:
+        """Root alias of `/api/v1/ready`. 503 while the database cannot be reached."""
+        from sqlalchemy import text
+
+        try:
+            with engine.database.engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        except Exception as exc:  # noqa: BLE001 - the probe reports any driver failure
+            return JSONResponse(
+                {"status": "degraded", "database": "unreachable", "detail": type(exc).__name__},
+                status_code=503,
+            )
+        return JSONResponse({"status": "ready", "database": "reachable"})
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics(request: Request) -> Response:
+        """Prometheus exposition. Open by default; set ATMPL_METRICS_PUBLIC=0 to gate it."""
+        if not settings.metrics_enabled:
+            raise ApiError(404, "not_found", "Metrics are disabled (ATMPL_METRICS_ENABLED=0).")
+        if not settings.metrics_public:
+            principal = dashboard_principal(request)
+            if not principal.has(Scope.METRICS_READ):
+                raise ApiError(403, "insufficient_scope", "Missing the 'metrics:read' scope.")
+        return Response(observability.metrics.render(), media_type=CONTENT_TYPE)
 
     return app
 

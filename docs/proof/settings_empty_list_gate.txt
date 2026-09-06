@@ -1,0 +1,40 @@
+GATE: an empty list variable is empty, not a start-up crash
+===========================================================
+
+Recorded 2026-09-06T12:53:46+00:00 on Windows 11, Python 3.12.10, from the tree this release was cut from.
+
+HOW THIS BUG WAS FOUND
+----------------------
+Not by a test. The kind smoke job in CI applied `overlays/dev`, the pod crash-looped,
+and `kubectl rollout status` timed out after 180 s. The dump-logs-on-failure step
+printed the reason: `SettingsError: error parsing value for field "provider_fallbacks"
+from source "EnvSettingsSource"`, from `json.loads("")`. The ConfigMap passes
+`ATMPL_PROVIDER_FALLBACKS: ""` to mean 'no fallbacks', and pydantic-settings decodes a
+`list[str]` field as JSON before any `mode="before"` validator can see it.
+
+WHAT WAS REMOVED
+----------------
+src/atmpl/settings.py - `CsvList = Annotated[list[str], NoDecode]` reduced to a plain
+`list[str]`, which is what the field was before the fix.
+
+RED - with the fix removed
+--------------------------
+>               raise SettingsError(
+                    f'error parsing value for field "{field_name}" from source "{self.__class__.__name__}"'
+                ) from e
+E               pydantic_settings.exceptions.SettingsError: error parsing value for field "provider_fallbacks" from source "EnvSettingsSource"
+
+.venv\Lib\site-packages\pydantic_settings\sources\base.py:610: SettingsError
+=========================== short test summary info ===========================
+FAILED tests/test_settings.py::test_an_empty_list_variable_means_empty_not_a_crash[ATMPL_PROVIDER_FALLBACKS]
+FAILED tests/test_settings.py::test_an_empty_list_variable_means_empty_not_a_crash[ATMPL_ALLOWED_ORIGINS]
+FAILED tests/test_settings.py::test_an_empty_list_variable_means_empty_not_a_crash[ATMPL_CSP_SCRIPT_SRC]
+FAILED tests/test_settings.py::test_a_comma_separated_list_is_split_and_trimmed
+FAILED tests/test_settings.py::test_the_provider_chain_is_the_primary_then_the_fallbacks_deduplicated
+FAILED tests/test_settings.py::test_every_list_setting_survives_an_empty_string
+6 failed, 1 passed in 0.44s
+
+GREEN - with the fix in place
+-----------------------------
+.......                                                                  [100%]
+7 passed in 0.02s

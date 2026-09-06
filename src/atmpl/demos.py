@@ -16,6 +16,7 @@ from atmpl.engine.database import (
     WebhookSubscription,
 )
 from atmpl.engine.service import AutomationEngine
+from atmpl.guardrails.decisions import GuardrailRejection
 from atmpl.intake.resolver import resolve_discovery
 from atmpl.redteam.contracts import EXPECTATIONS, run_all
 from atmpl.webhooks.inbound import mapping_block
@@ -508,3 +509,53 @@ def seed_demo_data(
     _seed_redteam_results(database)
     seed_inbound_sources(engine)
     return engine
+
+
+#: One drafting stage per demo, with a payload the deterministic policy gate accepts.
+EXERCISES: tuple[tuple[str, str, str, dict[str, Any]], ...] = (
+    ("wf_retail_eu", "classify_refund", "EU", {"requested_action": "refund"}),
+    ("wf_ministry_lesson", "enrich_lesson", "GLOBAL", {"requested_action": "enrich_lesson"}),
+    ("wf_bank_triage", "loan_extract", "GCC", {"requested_action": "extract_application"}),
+)
+
+
+def exercise_demos(engine: AutomationEngine) -> list[dict[str, Any]]:
+    """Run one real drafting stage per demo, so the deployment has real telemetry.
+
+    A hosted read-only demo is otherwise a dashboard whose LLMOps page correctly reports
+    that nothing has happened. This makes something happen — through the ordinary engine
+    path, on the configured provider — rather than seeding numbers that were never
+    measured. Every run it creates is marked synthetic like the rest of the demo data.
+    """
+    outcomes: list[dict[str, Any]] = []
+    for workflow_id, stage_key, region, extra in EXERCISES:
+        try:
+            run = engine.start_run(
+                workflow_id=workflow_id,
+                title=f"SYN-WARMUP — {stage_key} exercised at start-up",
+                region=region,
+            )
+            result = engine.process_ai_stage(
+                run.id,
+                stage_key,
+                {"region": region, "synthetic": True, **extra},
+            )
+            outcomes.append(
+                {
+                    "workflow": workflow_id,
+                    "stage": stage_key,
+                    "run_id": run.id,
+                    "status": result.status.value,
+                    "accepted": result.accepted,
+                }
+            )
+        except (KeyError, GuardrailRejection) as exc:
+            # A demo that cannot be exercised must not stop the deployment from serving.
+            outcomes.append(
+                {
+                    "workflow": workflow_id,
+                    "stage": stage_key,
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            )
+    return outcomes

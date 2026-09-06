@@ -1,0 +1,214 @@
+# Prompt regression for the discovery agent.
+#
+# The agent's only contract is that its answer is the template's questionnaire: every
+# declared field, no undeclared field, valid values. These cases hold it to that on the
+# deterministic mock (so CI can run them keyless) and on a hosted provider when one is
+# configured (`atmpl evals run --provider gemini`).
+
+category: typed_output
+
+cases:
+  - id: E-AGENT-01
+    title: The agent produces a valid retail questionnaire from a description
+    probe: discovery_agent
+    args:
+      template: retail_refund
+      organization: Northwind Retail
+      description: >-
+        Northwind Retail is a European e-commerce chain handling about 4,000 refund
+        requests a month. A store manager approves refunds up to 250 EUR; the regional
+        director approves anything above and owns escalations. Order records are
+        confidential and the team serves customers in en-GB and ar-KW under the EU 14-day
+        policy pack.
+    expect:
+      decision: valid
+
+  - id: E-AGENT-02
+    title: The agent produces a valid ministry questionnaire
+    probe: discovery_agent
+    args:
+      template: lesson_preparation
+      organization: Synthetic Ministry of Education
+      description: >-
+        A ministry prepares about 900 lesson plans a month against the national curriculum
+        framework. A department head reviews each plan and a quality assurance lead owns
+        the final gate before publication to the teacher portal. Content is internal and
+        prepared in ar-KW and en-GB.
+    expect:
+      decision: valid
+
+  - id: E-AGENT-03
+    title: The agent produces a valid bank questionnaire
+    probe: discovery_agent
+    args:
+      template: loan_triage
+      organization: Synthetic Regional Bank
+      description: >-
+        A regional bank triages roughly 1,800 loan applications a month up to 250,000. A
+        credit officer handles the first tier and a senior credit officer owns every
+        terminal decision; the credit risk committee takes escalations. Files are
+        restricted and a completeness score of 80 is required before human triage.
+    expect:
+      decision: valid
+
+  - id: E-AGENT-04
+    title: The agent may not answer for a different template than the one requested
+    probe: discovery_agent
+    rationale: >-
+      A bank description is handed in with the retail template named. The agent must answer
+      the template it was given; the deterministic mock does, and a hosted model that
+      wanders is caught by the same validation.
+    args:
+      template: retail_refund
+      organization: Synthetic Regional Bank
+      description: >-
+        A regional bank triages loan applications and a senior credit officer owns the
+        terminal decision.
+    expect:
+      decision: valid
+
+  - id: E-AGENT-05
+    title: A field the template does not declare is refused, not merged
+    probe: discovery_assembly
+    rationale: >-
+      The invented-field case. `governance.override_authority` does not exist in the retail
+      template; an agent that could add it could widen the contract the compiler validates.
+    args:
+      template: retail_refund
+      rationales:
+        - placeholder: governance.override_authority
+          rationale: The description mentioned an override path.
+          confidence: inferred
+      answers:
+        organization:
+          name: Northwind Retail
+          process_owner: customer_operations_lead
+          monthly_volume: 4200
+          data_sensitivity: confidential
+          locales: [en-GB]
+        governance:
+          approval_authority_matrix: [{ key: refund, value: store_manager }]
+          risk_appetite: conservative
+          escalation_owner: regional_director
+        regional:
+          region: EU
+          policy_pack: eu_gdpr_14_day
+          refund_limit: 250.0
+          currency: EUR
+    expect:
+      decision: refused
+      codes: [invented_field]
+
+  - id: E-AGENT-06
+    title: A policy pack that crosses its region is refused
+    probe: discovery_assembly
+    rationale: >-
+      The cross-field rule the compiler enforces (`EXPECTED_RETAIL_PACKS`): a US pack under
+      an EU region is not a typo the agent may pass through.
+    args:
+      template: retail_refund
+      rationales: []
+      answers:
+        organization:
+          name: Northwind Retail
+          process_owner: customer_operations_lead
+          monthly_volume: 4200
+          data_sensitivity: confidential
+          locales: [en-GB]
+        governance:
+          approval_authority_matrix: [{ key: refund, value: store_manager }]
+          risk_appetite: conservative
+          escalation_owner: regional_director
+        regional:
+          region: EU
+          policy_pack: us_standard
+          refund_limit: 250.0
+          currency: EUR
+    expect:
+      decision: refused
+      codes: [validation_error]
+
+  - id: E-AGENT-07
+    title: An answer of the wrong type is refused
+    probe: discovery_assembly
+    rationale: >-
+      `monthly_volume` is an integer. A model that writes "about four thousand" produces a
+      questionnaire that does not compile, and the caller is told which field.
+    args:
+      template: retail_refund
+      rationales: []
+      answers:
+        organization:
+          name: Northwind Retail
+          process_owner: customer_operations_lead
+          monthly_volume: about four thousand
+          data_sensitivity: confidential
+          locales: [en-GB]
+        governance:
+          approval_authority_matrix: [{ key: refund, value: store_manager }]
+          risk_appetite: conservative
+          escalation_owner: regional_director
+        regional:
+          region: EU
+          policy_pack: eu_gdpr_14_day
+          refund_limit: 250.0
+          currency: EUR
+    expect:
+      decision: refused
+      codes: [validation_error]
+
+  - id: E-AGENT-08
+    title: A value outside a fixed choice is refused
+    probe: discovery_assembly
+    args:
+      template: retail_refund
+      rationales: []
+      answers:
+        organization:
+          name: Northwind Retail
+          process_owner: customer_operations_lead
+          monthly_volume: 4200
+          data_sensitivity: top_secret
+          locales: [en-GB]
+        governance:
+          approval_authority_matrix: [{ key: refund, value: store_manager }]
+          risk_appetite: conservative
+          escalation_owner: regional_director
+        regional:
+          region: EU
+          policy_pack: eu_gdpr_14_day
+          refund_limit: 250.0
+          currency: EUR
+    expect:
+      decision: refused
+      codes: [validation_error]
+
+  - id: E-AGENT-09
+    title: An empty authority matrix is refused
+    probe: discovery_assembly
+    rationale: >-
+      Measured on `gemini-3.6-flash`: asked for a free-form object, it returns `{}` every
+      time. That is why authority maps travel as rows -- and why an empty one must fail
+      rather than compile into a workflow nobody may approve.
+    args:
+      template: retail_refund
+      rationales: []
+      answers:
+        organization:
+          name: Northwind Retail
+          process_owner: customer_operations_lead
+          monthly_volume: 4200
+          data_sensitivity: confidential
+          locales: [en-GB]
+        governance:
+          approval_authority_matrix: {}
+          risk_appetite: conservative
+          escalation_owner: regional_director
+        regional:
+          region: EU
+          policy_pack: eu_gdpr_14_day
+          refund_limit: 250.0
+          currency: EUR
+    expect:
+      decision: refused
+      codes: [validation_error]
