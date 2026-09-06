@@ -409,6 +409,9 @@ Every new gate was shown RED with its fix removed before being shown GREEN with 
 - [The Kubernetes security posture](docs/proof/k8s_manifest_gate.txt)
 - [An unpriced model is not priced at zero](docs/proof/cost_honesty_gate.txt)
 - [The agent may not widen the questionnaire](docs/proof/agent_invented_field_gate.txt)
+- [An empty list variable is empty, not a start-up crash](docs/proof/settings_empty_list_gate.txt)
+  — found by the kind job, not by a test: `ATMPL_PROVIDER_FALLBACKS: ""` is what a ConfigMap
+  passes for "no fallbacks", and pydantic-settings JSON-decoded it before any validator ran
 - [Full pytest output](docs/proof/pytest_full.txt)
 - [Clean-clone acceptance](docs/proof/clean_clone_acceptance.txt)
 - [RED-before evidence](docs/proof/redteam_red_before.txt) ·

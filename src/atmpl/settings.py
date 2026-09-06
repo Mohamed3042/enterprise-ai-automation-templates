@@ -5,9 +5,19 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import AliasChoices, Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+#: A comma-separated list, given as one environment variable.
+#:
+#: `NoDecode` is load-bearing. pydantic-settings treats any `list[str]` field as complex and
+#: runs `json.loads` on the raw value *before* a `mode="before"` validator ever sees it, so
+#: `ATMPL_PROVIDER_FALLBACKS=""` — which is what Compose and a Kubernetes ConfigMap pass for
+#: "no fallbacks" — raises `SettingsError` and the container never starts. Measured: the kind
+#: smoke job in CI caught exactly that, on exactly that variable.
+CsvList = Annotated[list[str], NoDecode]
 
 DEFAULT_SQLITE_PATH = Path("var") / "atmpl.db"
 
@@ -36,7 +46,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ATMPL_ADAPTER", "ATMPL_LLM_ADAPTER"),
     )
     #: Fallback chain tried in order after ``adapter`` fails. Never chosen by a caller (G7).
-    provider_fallbacks: list[str] = Field(default_factory=list)
+    provider_fallbacks: CsvList = Field(default_factory=list)
     provider_timeout_seconds: float = 30.0
     provider_max_attempts: int = 3
     provider_backoff_seconds: float = 0.5
@@ -67,11 +77,11 @@ class Settings(BaseSettings):
     secrets_file: Path | None = None
 
     # --- HTTP hardening ----------------------------------------------------
-    allowed_origins: list[str] = Field(default_factory=list)
+    allowed_origins: CsvList = Field(default_factory=list)
     rate_limit: str = "120/minute"
     max_body_bytes: int = 1_048_576
     hsts_enabled: bool = False
-    csp_script_src: list[str] = Field(default_factory=lambda: ["https://unpkg.com"])
+    csp_script_src: CsvList = Field(default_factory=lambda: ["https://unpkg.com"])
 
     # --- identity ----------------------------------------------------------
     admin_user: str | None = None
@@ -99,6 +109,7 @@ class Settings(BaseSettings):
     @field_validator("allowed_origins", "csp_script_src", "provider_fallbacks", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
+        """``"a, b"`` -> ``["a", "b"]``; ``""`` -> ``[]`` rather than a start-up crash."""
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value

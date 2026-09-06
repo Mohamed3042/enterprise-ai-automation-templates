@@ -31,6 +31,14 @@ thirtyfold. And a `dict[str, str]` field is expressible in JSON Schema but not i
 provider's structured-output mode — asked for a free-form object, `gemini-3.6-flash` returned
 `{}` every time, so authority maps travel as key/value rows and are rebuilt before validation.
 
+**And one the kind job found that no test had:** `ATMPL_PROVIDER_FALLBACKS: ""` — what a
+Kubernetes ConfigMap passes for "no fallbacks" — crashed start-up, because pydantic-settings
+JSON-decodes a `list[str]` field before any `mode="before"` validator runs. The pod
+crash-looped, `rollout status` timed out, and the dump-logs-on-failure step named it. Fixed
+with `Annotated[list[str], NoDecode]`, and now covered by a test that enumerates the list-typed
+settings rather than trusting the next person to add a case
+(`docs/proof/settings_empty_list_gate.txt`).
+
 **Boundary:** Gemini is live-verified; the Anthropic and OpenAI-compatible adapters are
 **contract-tested against recorded responses**, because no key for either exists on the machine
 this was built on — the README says exactly that rather than "supports all major providers".
