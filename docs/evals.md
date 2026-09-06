@@ -88,7 +88,11 @@ and the totals count them separately.
 The live run costs real tokens. CI runs it only on `push` and only where the `GEMINI_API_KEY`
 secret exists; forks run the keyless suite and stay green.
 
-**The live run is reported, not gated**, and the first one is why. With the 30 s provider
+**A quota is not a defect either.** The live contract tests skip — with the provider's own
+message, never as a pass — when the account's quota is exhausted, because a 429 says something
+about a billing plan and nothing about this code.
+
+**The live eval run is reported, not gated**, and the first one is why. With the 30 s provider
 timeout this repository shipped, `E-AGENT-02` timed out on all three attempts, the circuit
 breaker opened, and the two cases behind it failed with `circuit breaker open`. Every part of
 that was the system working: a slow provider, bounded retries, a breaker doing its job. None of

@@ -15,6 +15,7 @@ import os
 import pytest
 
 from atmpl.providers import GeminiProvider, Message, ProviderRouter, load_prices
+from atmpl.providers.router import AllProvidersFailed
 from atmpl.settings import Settings
 from atmpl.telemetry import build_observability
 
@@ -37,6 +38,23 @@ DRAFT_SCHEMA = {
 }
 
 
+def live(call):
+    """Run a live call, or skip if the account's quota is gone.
+
+    A 429 says something about the billing plan, not about this repository's code, so it
+    must not read as either a pass or a defect. Pytest reports it as a skip with the
+    provider's own message, and CI reports the job as having skipped the contract — which is
+    what actually happened.
+    """
+    try:
+        return call()
+    except AllProvidersFailed as exc:
+        message = str(exc).lower()
+        if "rate_limited" in message or "quota" in message:
+            pytest.skip(f"the provider's quota is exhausted; contract not exercised: {exc}")
+        raise
+
+
 def live_router() -> ProviderRouter:
     settings = Settings(_env_file=None).model_copy(  # type: ignore[call-arg]
         update={"adapter": "gemini"}  # 90 s is the default, for the reason in settings.py
@@ -47,17 +65,19 @@ def live_router() -> ProviderRouter:
 def test_gemini_answers_in_the_declared_schema():
     router = live_router()
 
-    result = router.complete(
-        [
-            Message("system", "You draft for a human reviewer. You never decide."),
-            Message(
-                "user",
-                "Draft a triage note for a synthetic loan application of 48,000 KWD with "
-                "complete documents. Return the declared JSON object only.",
-            ),
-        ],
-        schema=DRAFT_SCHEMA,
-        max_tokens=2048,
+    result = live(
+        lambda: router.complete(
+            [
+                Message("system", "You draft for a human reviewer. You never decide."),
+                Message(
+                    "user",
+                    "Draft a triage note for a synthetic loan application of 48,000 KWD with "
+                    "complete documents. Return the declared JSON object only.",
+                ),
+            ],
+            schema=DRAFT_SCHEMA,
+            max_tokens=2048,
+        )
     )
 
     assert result.provider == "gemini"
@@ -69,7 +89,7 @@ def test_gemini_answers_in_the_declared_schema():
 def test_a_live_call_is_costed_and_recorded():
     router = live_router()
 
-    result = router.complete([Message("user", "Reply with the single word: ready")])
+    result = live(lambda: router.complete([Message("user", "Reply with the single word: ready")]))
     record = router.observability.calls.records()[0]
 
     assert result.usage.input_tokens and result.usage.input_tokens > 0
