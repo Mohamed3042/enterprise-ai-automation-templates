@@ -47,7 +47,11 @@ class Settings(BaseSettings):
     )
     #: Fallback chain tried in order after ``adapter`` fails. Never chosen by a caller (G7).
     provider_fallbacks: CsvList = Field(default_factory=list)
-    provider_timeout_seconds: float = 30.0
+    #: 90 s, not 30. Measured on `gemini-3.6-flash`: one structured-output call with the
+    #: discovery schema took 28.5 s, and the first live eval run in CI timed out at 30 s on
+    #: every attempt, then opened the circuit breaker and failed the two cases behind it.
+    #: A thinking model with a schema is a tens-of-seconds call, not a sub-second one.
+    provider_timeout_seconds: float = 90.0
     provider_max_attempts: int = 3
     provider_backoff_seconds: float = 0.5
     provider_breaker_threshold: int = 3

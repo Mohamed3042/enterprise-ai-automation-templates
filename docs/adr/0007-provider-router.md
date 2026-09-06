@@ -49,6 +49,10 @@ implied.
   - A thinking model bills its thoughts. A live answer of **61 tokens carried 1,844
     reasoning tokens**; counting only `candidatesTokenCount` under-reports the cost by thirty
     times, so `_usage()` adds `thoughtsTokenCount` to the output count.
+- **The default timeout is 90 s, and that number was measured, not chosen.** At 30 s the
+  first live eval run in CI timed out on every attempt of one case, opened the circuit
+  breaker, and failed the two cases behind it — all of it correct behaviour, none of it a
+  defect. A thinking model answering into a JSON schema took 28.5 s for one discovery call.
 - Cost is an **estimate** from `providers/prices.yaml`, which carries the date it was read
   and the date it stops being right (Google publishes a step change on 2027-01-01). A model
   the table does not know is reported as *not priced*, never as zero — the fail-first proof

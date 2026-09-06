@@ -167,6 +167,16 @@ jobs:
           fi
           pytest -m live -v
           python -m atmpl providers check --ping
+      - name: Score the eval suite against the live provider (reported, not gated)
+        # The gate is the deterministic keyless run in the `quality` job (docs/evals.md says
+        # why). This run is a measurement against a hosted model: a provider timeout or a
+        # 5xx is information about the provider, not a defect in this repository, and it
+        # must not decide whether the build ships.
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then exit 0; fi
           python -m atmpl evals run --provider gemini --out var/evals-live
       - name: Upload the live eval report
         if: always()

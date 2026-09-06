@@ -39,7 +39,7 @@ DRAFT_SCHEMA = {
 
 def live_router() -> ProviderRouter:
     settings = Settings(_env_file=None).model_copy(  # type: ignore[call-arg]
-        update={"adapter": "gemini", "provider_timeout_seconds": 90.0}
+        update={"adapter": "gemini"}  # 90 s is the default, for the reason in settings.py
     )
     return ProviderRouter(settings, observability=build_observability(settings, install=False))
 

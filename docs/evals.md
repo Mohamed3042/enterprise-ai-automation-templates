@@ -88,6 +88,17 @@ and the totals count them separately.
 The live run costs real tokens. CI runs it only on `push` and only where the `GEMINI_API_KEY`
 secret exists; forks run the keyless suite and stay green.
 
+**The live run is reported, not gated**, and the first one is why. With the 30 s provider
+timeout this repository shipped, `E-AGENT-02` timed out on all three attempts, the circuit
+breaker opened, and the two cases behind it failed with `circuit breaker open`. Every part of
+that was the system working: a slow provider, bounded retries, a breaker doing its job. None of
+it was a defect in this repository, and none of it should decide whether a build ships.
+
+Two things came out of it. The default timeout is now **90 s**, because a thinking model
+answering into a JSON schema is a tens-of-seconds call — 28.5 s measured for one discovery
+call. And the live step is `continue-on-error`, so its report uploads either way while the
+gate stays where it can mean something: the deterministic, keyless run.
+
 ## Adding a case
 
 ```yaml
