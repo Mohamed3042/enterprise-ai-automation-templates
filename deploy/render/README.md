@@ -1,30 +1,44 @@
 # The public demo, on Render
 
-The Blueprint is [`render.yaml`](../../render.yaml) at the repository root — Render only looks
-for it there. It runs the image CI published, so the public URL is the same artifact as
-`docker run ghcr.io/mohamed3042/enterprise-ai-automation-templates:v0.3.0`; the only difference
-is the environment.
+`deploy/render/Dockerfile` is `FROM` the exact image CI published, plus the environment a
+public demo needs and nothing else. Render builds it; the running bytes are still the ones
+that were tested.
 
-## Publishing it (browser, once)
+## Publishing it (browser, once — no card, no Blueprint)
 
 1. <https://dashboard.render.com> → sign in with GitHub.
-2. **New** → **Blueprint**.
-3. Pick `Mohamed3042/enterprise-ai-automation-templates`, branch `main`.
-4. Render reads `render.yaml`, shows one web service named `atmpl-governed-automation` on the
-   **free** plan → **Apply**.
+2. **New +** → **Web Service**.
+3. **Build and deploy from a Git repository** → `Mohamed3042/enterprise-ai-automation-templates`,
+   branch `main`.
+4. Set exactly three fields, then **Deploy**:
 
-No credential is pasted anywhere outside Render's own login. The first deploy pulls a 325 MB
-image, so give it a few minutes.
+   | Field | Value |
+   |---|---|
+   | Language / Runtime | **Docker** |
+   | Dockerfile Path | `./deploy/render/Dockerfile` |
+   | Instance Type | **Free** |
+
+   Leave **Environment Variables** empty. Everything the demo needs is in the Dockerfile, so
+   there is no form field to mistype into a deployment that quietly is not read-only.
+
+The first build pulls a 325 MB base image, so give it a few minutes.
+
+### Why not the Blueprint
+
+`render.yaml` is committed and correct, and **Apply Blueprint asked for a card** on
+2026-09-06 — as did deploying a prebuilt registry image (`runtime: image`). The path above
+avoids both. The Blueprint is kept for whenever a paid plan makes it available; it points at
+the same Dockerfile, so the two cannot drift.
 
 ## What to expect
 
 | | |
 |---|---|
-| URL | `https://atmpl-governed-automation.onrender.com` (Render assigns it; confirm in the dashboard) |
 | Health check | `/health`, which answers without touching the database |
-| Cold start | **~30 s.** A free service spins down after ~15 minutes idle, and the first request after that waits for the container. That is the cost of the free plan and it is worth saying out loud to anyone you send the link to. |
-| Storage | Ephemeral. SQLite lives in the container's filesystem and resets on every deploy and every spin-up — which is correct here: the demos are seeded and the eval suite is scored at start-up, so a fresh container is a *freshly measured* one. |
+| Cold start | **~30 s.** A free instance spins down after ~15 minutes idle. Worth saying to anyone you send the link to — a reviewer who thinks it is broken is worse off than one who was told it sleeps. |
+| Storage | Ephemeral, and correct here: a fresh container re-scores its own eval suite and re-exercises the engine at boot, so what `/evals` and `/llmops` show was measured minutes ago. |
 | Provider | The deterministic offline mock. A live key on a public URL is a bill waiting for a crawler. |
+| Port | Passed explicitly as `--port ${PORT:-10000}`. The pinned base image predates `demo up` reading `$PORT`, and it bound 8000 and went unhealthy until this was made explicit. |
 
 ## Why the demo is read-only
 
@@ -34,8 +48,8 @@ image, so give it a few minutes.
 {"error": {"code": "demo_readonly", "message": "This is a read-only public demo. Run it locally to make decisions: …"}}
 ```
 
-Every page can be read; nothing can be changed; no key can be spent. To make a decision, run it
-locally — one command, no key:
+Every page can be read; nothing can be changed; no key can be spent. To make a decision, run
+it locally — one command, no key:
 
 ```bash
 docker run -p 8000:8000 ghcr.io/mohamed3042/enterprise-ai-automation-templates:latest
@@ -43,17 +57,18 @@ docker run -p 8000:8000 ghcr.io/mohamed3042/enterprise-ai-automation-templates:l
 
 ## Redeploying after a release
 
-The Blueprint pins an image tag, so a new release is two steps: bump `image.url` in
-`render.yaml` and push (Render redeploys on the Blueprint change), or hit a deploy hook.
-
-To let CI do it, add the hook from **Settings → Deploy Hook** as a repository secret:
+The Dockerfile pins a base tag, so a new release is a one-line edit to its `FROM` plus a push;
+Render rebuilds on push to `main`. To let CI force it, add the hook from
+**Settings → Deploy Hook**:
 
 ```bash
 gh secret set RENDER_DEPLOY_HOOK -R Mohamed3042/enterprise-ai-automation-templates
+gh variable set DEMO_URL -R Mohamed3042/enterprise-ai-automation-templates --body "https://<service>.onrender.com"
 ```
 
-The `render` job in `.github/workflows/ci.yml` calls it on a `main` push when that secret
-exists, and does nothing when it does not.
+The `demo` job in `.github/workflows/ci.yml` then triggers the deploy and polls `DEMO_URL/health`
+for up to five minutes — waiting for a cold start rather than asserting on one request. With
+neither set, the job prints what to do and exits 0.
 
 ## Why not a Hugging Face Space
 

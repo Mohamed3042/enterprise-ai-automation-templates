@@ -157,36 +157,47 @@ def render_service() -> dict:
     return documents(RENDER)[0]["services"][0]
 
 
-def test_the_blueprint_runs_the_published_image_on_the_free_plan(render_service):
-    assert render_service["runtime"] == "image"
+DEMO_DOCKERFILE = RENDER.parent / "deploy" / "render" / "Dockerfile"
+
+
+def test_the_blueprint_builds_the_dockerfile_the_manual_path_uses(render_service):
+    """Blueprint and dashboard must not drift: both build the same file on the free plan.
+
+    `runtime: docker`, not `image` — deploying a prebuilt registry image asked for a card.
+    """
+    assert render_service["runtime"] == "docker"
     assert render_service["plan"] == "free"
-    assert render_service["image"]["url"].startswith(
-        "ghcr.io/mohamed3042/enterprise-ai-automation-templates:"
-    )
-    assert not render_service["image"]["url"].endswith(":latest"), (
+    assert render_service["dockerfilePath"] == "./deploy/render/Dockerfile"
+    assert render_service["healthCheckPath"] == "/health"
+    assert DEMO_DOCKERFILE.exists()
+
+
+def test_the_public_demo_is_read_only_keyless_and_pinned():
+    """The whole safety model of a public URL: readable, unchangeable, unable to spend a key."""
+    dockerfile = DEMO_DOCKERFILE.read_text(encoding="utf-8")
+
+    assert "ATMPL_DEMO_READONLY=1" in dockerfile
+    assert "ATMPL_ADAPTER=mock" in dockerfile
+    assert "--no-open-api" in dockerfile
+    base = next(line for line in dockerfile.splitlines() if line.startswith("FROM "))
+    assert "ghcr.io/mohamed3042/enterprise-ai-automation-templates:" in base
+    assert not base.strip().endswith(":latest"), (
         "a demo pinned to :latest changes under its own link when another branch merges"
     )
 
 
-def test_the_public_demo_is_read_only_and_keyless(render_service):
-    """The whole safety model of a public URL: readable, unchangeable, unable to spend a key."""
-    env = {item["key"]: item["value"] for item in render_service["envVars"]}
+def test_the_demo_binds_the_port_the_host_asks_for():
+    """Measured: the pinned base predates `demo up` reading $PORT. It bound 8000 and the
+    health check never answered, so the port is passed explicitly instead of inherited."""
+    dockerfile = DEMO_DOCKERFILE.read_text(encoding="utf-8")
 
-    assert env["ATMPL_DEMO_READONLY"] == "1"
-    assert env["ATMPL_DEMO_OPEN_API"] == "0"
-    assert env["ATMPL_ADAPTER"] == "mock"
-    assert render_service["healthCheckPath"] == "/health"
+    assert "--port ${PORT:-10000}" in dockerfile
 
 
-def test_every_blueprint_variable_is_a_setting_this_build_understands(render_service):
-    """Same check as the ConfigMap one, for the same reason: a typo is silently ignored."""
-    from atmpl.settings import Settings
-
-    known = {f"ATMPL_{name.upper()}" for name in Settings.model_fields}
-    known |= {"ATMPL_LLM_ADAPTER", "PORT"}
-    unknown = sorted({item["key"] for item in render_service["envVars"]} - known)
-
-    assert unknown == []
+def test_the_demo_needs_no_environment_variables_typed_into_a_form(render_service):
+    """Every value is in the Dockerfile, so a hand-created service cannot be mistyped into a
+    deployment that quietly is not read-only."""
+    assert render_service["envVars"] == []
 
 
 def test_demo_up_listens_where_the_host_tells_it_to(monkeypatch):

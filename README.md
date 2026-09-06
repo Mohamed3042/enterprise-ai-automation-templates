@@ -28,15 +28,17 @@ in the demos are **synthetic and fake**.
 ## Verify in two minutes
 
 **A read-only public demo is built and awaiting one Blueprint apply.**
-[`render.yaml`](render.yaml) runs the published image on Render's free plan, read-only, with
-the deterministic offline provider — see [`deploy/render/`](deploy/render/). Its URL is not
-claimed here until a 200 has been measured on it. The path below is the one that is measured
-today.
+[`deploy/render/Dockerfile`](deploy/render/Dockerfile) is `FROM` the exact image CI published
+plus the environment a public demo needs, and Render's free plan builds it — read-only,
+keyless, four clicks, no card. See [`deploy/render/`](deploy/render/). Its URL is not claimed
+here until a 200 has been measured on it. The path below is the one that is measured today.
 
-*(A Hugging Face Docker Space was the original plan. As of 2026-09-06 that returns
-`402 Payment Required` — "hosting Gradio and Docker Spaces on free cpu-basic requires a PRO
-subscription" — measured after a successful `hf auth login`. `deploy/hf-space/` is kept and
-works the day the account is PRO.)*
+*(Two hosted routes were measured and rejected on the same day. A Hugging Face Docker Space
+returns `402 Payment Required` — "hosting Gradio and Docker Spaces on free cpu-basic requires
+a PRO subscription" — after a successful `hf auth login`; and on Render, both applying a
+Blueprint and deploying a prebuilt registry image ask for a card. Building a Dockerfile from
+the repository does not. `deploy/hf-space/` and `render.yaml` are both kept, correct and
+tested, for the day a paid plan makes them the shorter path.)*
 
 From a clean clone — this exact sequence is recorded in
 [`docs/proof/clean_clone_acceptance.txt`](docs/proof/clean_clone_acceptance.txt):
