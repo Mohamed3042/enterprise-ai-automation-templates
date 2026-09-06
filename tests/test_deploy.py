@@ -145,3 +145,57 @@ def test_every_configmap_key_is_a_setting_this_build_understands():
     for path in K8S.rglob("configmap.yaml"):
         unknown = sorted(set(documents(path)[0]["data"]) - known)
         assert unknown == [], f"{path.name}: unknown settings {unknown}"
+
+
+# --------------------------------------------------------------------------- the public demo
+
+RENDER = K8S.parents[1] / "render.yaml"
+
+
+@pytest.fixture(scope="module")
+def render_service() -> dict:
+    return documents(RENDER)[0]["services"][0]
+
+
+def test_the_blueprint_runs_the_published_image_on_the_free_plan(render_service):
+    assert render_service["runtime"] == "image"
+    assert render_service["plan"] == "free"
+    assert render_service["image"]["url"].startswith(
+        "ghcr.io/mohamed3042/enterprise-ai-automation-templates:"
+    )
+    assert not render_service["image"]["url"].endswith(":latest"), (
+        "a demo pinned to :latest changes under its own link when another branch merges"
+    )
+
+
+def test_the_public_demo_is_read_only_and_keyless(render_service):
+    """The whole safety model of a public URL: readable, unchangeable, unable to spend a key."""
+    env = {item["key"]: item["value"] for item in render_service["envVars"]}
+
+    assert env["ATMPL_DEMO_READONLY"] == "1"
+    assert env["ATMPL_DEMO_OPEN_API"] == "0"
+    assert env["ATMPL_ADAPTER"] == "mock"
+    assert render_service["healthCheckPath"] == "/health"
+
+
+def test_every_blueprint_variable_is_a_setting_this_build_understands(render_service):
+    """Same check as the ConfigMap one, for the same reason: a typo is silently ignored."""
+    from atmpl.settings import Settings
+
+    known = {f"ATMPL_{name.upper()}" for name in Settings.model_fields}
+    known |= {"ATMPL_LLM_ADAPTER", "PORT"}
+    unknown = sorted({item["key"] for item in render_service["envVars"]} - known)
+
+    assert unknown == []
+
+
+def test_demo_up_listens_where_the_host_tells_it_to(monkeypatch):
+    """Render, Cloud Run and Fly all say 'listen here' with $PORT. Ask the parser, not the docs."""
+    from atmpl.cli import build_parser
+
+    monkeypatch.setenv("PORT", "10000")
+    assert build_parser().parse_args(["demo", "up"]).port == 10000
+
+    monkeypatch.delenv("PORT")
+    assert build_parser().parse_args(["demo", "up"]).port == 8000
+    assert build_parser().parse_args(["demo", "up", "--port", "1234"]).port == 1234

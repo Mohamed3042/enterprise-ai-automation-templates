@@ -12,6 +12,13 @@ short_description: A read-only demo of governed, human-authority AI automation
 
 # Enterprise AI Automation Templates — public demo
 
+> **Not the live demo.** As of 2026-09-06, Hugging Face returns
+> `402 Payment Required` when creating a Docker Space: *"Static Spaces are free for everyone,
+> but hosting Gradio and Docker Spaces on free cpu-basic requires a PRO subscription."*
+> Measured — `hf auth login` succeeded and `create_repo` still refused. The live demo is on
+> Render (`deploy/render/`); this folder is kept because it costs nothing and works the day
+> the account is PRO.
+
 A **read-only** deployment of
 [Mohamed3042/enterprise-ai-automation-templates](https://github.com/Mohamed3042/enterprise-ai-automation-templates).
 

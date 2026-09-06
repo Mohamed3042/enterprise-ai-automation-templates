@@ -6,9 +6,11 @@ What to open, what to click, what the audience sees, and the sentence that keeps
 is real is the machinery: the rules, the ledger, and the fact that the AI cannot be the one who
 decides."*
 
-**A read-only public demo is prepared but not yet published** — `deploy/hf-space/` is
-complete and CI-wired, and one interactive `hf auth login` turns it on. Until then, run it
-locally; the two steps that change state (§4 and §6) need a local copy anyway.
+**A read-only public demo is prepared and awaiting one Blueprint apply** on Render
+(`deploy/render/`); its URL is not quoted until a 200 has been measured on it. Run it locally
+meanwhile — the two steps that change state (§4 and §6) need a local copy anyway, and a free
+instance cold-starts for ~30 s after fifteen minutes idle, which is worth knowing before you
+open a link in front of an audience.
 
 ## Before the room
 

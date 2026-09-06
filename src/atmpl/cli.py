@@ -78,7 +78,15 @@ def build_parser() -> argparse.ArgumentParser:
     demo_subcommands = demo.add_subparsers(dest="demo_command", required=True)
     demo_up = demo_subcommands.add_parser("up", help="Seed all demos and serve the dashboard.")
     demo_up.add_argument("--host", default="127.0.0.1")
-    demo_up.add_argument("--port", type=int, default=8000)
+    demo_up.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("PORT", "8000")),
+        help=(
+            "Port to serve on. Defaults to $PORT when set, which is how every container "
+            "host from Render to Cloud Run tells a service where to listen."
+        ),
+    )
     demo_up.add_argument(
         "--no-open-api",
         action="store_true",

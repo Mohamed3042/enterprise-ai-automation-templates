@@ -35,8 +35,20 @@ pydantic-settings ignores a key it does not recognise and a typo would otherwise
 
 ## Decision — the public demo
 
-A Hugging Face **Docker** Space that runs the published image with three environment
-variables and no rebuild, so the public URL is byte-for-byte the image on GHCR.
+A container host that runs the published image with a handful of environment variables and no
+rebuild, so the public URL is byte-for-byte the image on GHCR.
+
+**The host changed once, and the reason is worth keeping.** The plan was a Hugging Face Docker
+Space. `hf auth login` succeeded as `Medo4334`, and `HfApi.create_repo` then returned
+`402 Payment Required`: *"Static Spaces are free for everyone, but hosting Gradio and Docker
+Spaces on free cpu-basic requires a PRO subscription."* That is a pricing change, not a
+mistake in the code — so `deploy/hf-space/` is kept intact for the day the account is PRO, and
+the live demo moved to **Render** (`render.yaml` at the repository root, because that is the
+only place Render looks for a Blueprint).
+
+The trade is stated rather than hidden: Render's free instance spins down after ~15 minutes
+idle, so the first request after that waits ~30 s. `deploy/render/README.md` says so, because
+a reviewer who thinks a service is broken is worse off than one who was told it sleeps.
 
 `ATMPL_DEMO_READONLY=1` refuses every non-GET request in middleware, with a banner saying so.
 That is the whole safety model of a public demo: every page can be read, nothing can be
@@ -60,15 +72,21 @@ bill waiting for a crawler.
 - `kind` and `kubeconform` are not installed on the build machine; the manifests are rendered
   and reviewed locally with `kubectl kustomize`, and both tools run in CI. That split is
   stated rather than papered over.
-- Publishing the Space needs a Hugging Face **write token**, which is a human step
-  (`hf auth login`). `deploy/hf-space/push_space.py` is idempotent and also runs in CI when
-  the `HF_TOKEN` secret exists.
+- Publishing needs one browser step on the host's own dashboard, and no credential ever
+  leaves it: Render reads `render.yaml` from the connected repository. CI then redeploys
+  through a deploy hook when `RENDER_DEPLOY_HOOK` exists, and measures the URL when a
+  `DEMO_URL` repository variable exists — waiting for a cold start rather than asserting on
+  one request.
+- `demo up --port` now defaults to `$PORT`, which is how Render, Cloud Run and Fly all tell a
+  service where to listen. Nothing changes locally: without `PORT`, it is still 8000.
 
 ## Alternatives considered
 
 - **Helm.** A chart is the right answer for something other people install. This is one
   Deployment with two overlays; kustomize renders it with no templating language in between,
   and `kubectl kustomize` is in every kubectl.
-- **A cloud provider's container service** for the public demo. It would make the `cloud`
-  claim name-exact, and it needs an account and a card. The Space is live today and honest
-  about being a Space.
+- **Google Cloud Run**, which would make the `cloud` claim name-exact and is the gaps plan's
+  own alternative. Rejected for now on one property: its free tier still requires billing
+  enabled, and a card on a portfolio demo is a standing risk for no functional gain. Render's
+  free plan needs none. If the CV line matters more than the card later, `render.yaml` is
+  twenty lines and the image is the same.

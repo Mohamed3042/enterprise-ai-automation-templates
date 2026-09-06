@@ -1,7 +1,7 @@
-........................................................................ [ 28%]
-........................................................................ [ 56%]
-.................................................................s...... [ 84%]
-.........................................                                [100%]
+........................................................................ [ 27%]
+........................................................................ [ 55%]
+.....................................................................s.. [ 82%]
+.............................................                            [100%]
 ============================== warnings summary ===============================
 tests/test_agents.py::test_the_mock_agent_answers_every_template_validly[retail_refund]
   C:\Users\GAMING\Downloads\enterprise-ai-automation-templates\.venv\Lib\site-packages\pydantic_graph\_utils.py:67: DeprecationWarning: There is no current event loop
@@ -14,4 +14,4 @@ tests/test_auth.py::test_tampered_session_cookie_is_rejected
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ===========================
 SKIPPED [1] tests\test_secrets.py:54: POSIX file modes
-256 passed, 1 skipped, 3 deselected, 2 warnings in 62.89s (0:01:02)
+260 passed, 1 skipped, 3 deselected, 2 warnings in 68.27s (0:01:08)

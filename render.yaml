@@ -1,0 +1,66 @@
+# Render Blueprint — the read-only public demo.
+#
+# This file has to live at the repository root: that is where Render looks for a Blueprint.
+# The details, the click path and what to expect are in `deploy/render/README.md`.
+#
+# `runtime: image` runs the image CI published, rather than rebuilding from source. What a
+# reviewer opens at the public URL is therefore the same artifact as
+# `docker run ghcr.io/mohamed3042/enterprise-ai-automation-templates:v0.3.0`, and the only
+# difference between the two is the environment below.
+#
+# The tag is pinned. `:latest` would mean the demo changes under its own link the day another
+# branch merges; a new release is a one-line edit here plus a deploy.
+
+services:
+  - type: web
+    name: atmpl-governed-automation
+    runtime: image
+    plan: free
+    region: frankfurt
+    image:
+      url: ghcr.io/mohamed3042/enterprise-ai-automation-templates:v0.3.0
+
+    # Two things happen before the server starts, and both are the deployment measuring
+    # itself: `evals run` scores the suite inside this container so /evals shows this
+    # deployment's own report, and `--exercise` drafts one AI stage per demo so /llmops shows
+    # real calls with real latencies instead of correctly reporting an idle process.
+    dockerCommand: >-
+      sh -c "python -m atmpl evals run --out var/evals;
+      exec python -m atmpl demo up --host 0.0.0.0 --no-open-api --exercise"
+
+    healthCheckPath: /health
+
+    envVars:
+      # The whole safety model of a public demo: every page can be read, nothing can be
+      # changed, and no model key can be spent from it.
+      - key: ATMPL_DEMO_READONLY
+        value: "1"
+      - key: ATMPL_DEMO_OPEN_API
+        value: "0"
+      # The deterministic offline provider. A public URL with a live key is a bill waiting
+      # for a crawler; a hosted provider here would be a deliberate, separate decision.
+      - key: ATMPL_ADAPTER
+        value: mock
+      - key: ATMPL_PROVIDER_FALLBACKS
+        value: ""
+      - key: ATMPL_DATABASE_URL
+        value: sqlite:///var/atmpl.db
+      - key: ATMPL_AUTO_CREATE_SCHEMA
+        value: "true"
+      - key: ATMPL_RATE_LIMIT
+        value: 60/minute
+      - key: ATMPL_METRICS_ENABLED
+        value: "1"
+      - key: ATMPL_METRICS_PUBLIC
+        value: "1"
+      - key: ATMPL_JSON_LOGS
+        value: "1"
+      - key: ATMPL_TRACE_EXPORTER
+        value: none
+      # The outbound delivery worker has nothing to deliver to here, and a public demo
+      # should not be making outbound requests on a schedule.
+      - key: ATMPL_WEBHOOK_WORKER
+        value: "0"
+      # `demo up` reads $PORT, which is how Render tells a service where to listen.
+      - key: PORT
+        value: "10000"

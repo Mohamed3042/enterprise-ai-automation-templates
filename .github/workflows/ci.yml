@@ -186,29 +186,43 @@ jobs:
           path: var/evals-live/
           if-no-files-found: ignore
 
-  space:
-    name: Publish the Hugging Face Space
+  demo:
+    name: Redeploy the public demo
     runs-on: ubuntu-latest
     needs: [image]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - name: Install the hub client
-        run: python -m pip install "huggingface_hub>=0.35,<1" httpx
-      - name: Upload the Space and measure the live URL
+      - name: Trigger the Render deploy hook
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
-          if [ -z "$HF_TOKEN" ]; then
-            echo "HF_TOKEN is not set for this repository; the Space is not re-deployed."
-            echo "Set it with: gh secret set HF_TOKEN -R $GITHUB_REPOSITORY"
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK is not set; the public demo is not redeployed."
+            echo "Add it from Render > Settings > Deploy Hook:"
+            echo "  gh secret set RENDER_DEPLOY_HOOK -R $GITHUB_REPOSITORY"
             exit 0
           fi
-          python deploy/hf-space/push_space.py --attempts 30
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK" > /dev/null
+          echo "Render deploy triggered. The Blueprint pins an image tag, so this only picks"
+          echo "up a new build when render.yaml's image.url has moved."
+      - name: Measure the public URL
+        env:
+          DEMO_URL: ${{ vars.DEMO_URL }}
+        run: |
+          if [ -z "$DEMO_URL" ]; then
+            echo "No DEMO_URL repository variable; nothing to measure."
+            exit 0
+          fi
+          # A free instance cold-starts, so this waits rather than asserting on one request.
+          for attempt in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 40 "$DEMO_URL/health" || true)
+            echo "[$attempt/30] GET $DEMO_URL/health -> $code"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 10
+          done
+          echo "The public demo did not answer 200 within five minutes."
+          exit 1
 
   image:
     name: Build image (and publish from main)
