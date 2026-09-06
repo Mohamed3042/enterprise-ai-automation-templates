@@ -6,9 +6,9 @@ What to open, what to click, what the audience sees, and the sentence that keeps
 is real is the machinery: the rules, the ledger, and the fact that the AI cannot be the one who
 decides."*
 
-**Nothing to install:** <https://huggingface.co/spaces/Medo4334/atmpl-governed-automation>
-is this same image, read-only. Every page below is there; the two steps that change state
-(§4 and §6) need a local copy, and the Space says so in a banner.
+**A read-only public demo is prepared but not yet published** — `deploy/hf-space/` is
+complete and CI-wired, and one interactive `hf auth login` turns it on. Until then, run it
+locally; the two steps that change state (§4 and §6) need a local copy anyway.
 
 ## Before the room
 

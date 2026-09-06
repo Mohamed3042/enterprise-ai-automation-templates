@@ -6,7 +6,6 @@
 [![Safety G1–G7](https://img.shields.io/badge/Safety-G1--G7-102b35)](docs/safety-framework.md)
 [![Container](https://img.shields.io/badge/ghcr.io-enterprise--ai--automation--templates-102b35)](https://github.com/Mohamed3042/enterprise-ai-automation-templates/pkgs/container/enterprise-ai-automation-templates)
 [![Evals 61/61](https://img.shields.io/badge/evals-61%2F61%20gated-0b6b53)](docs/evals.md)
-[![Live demo](https://img.shields.io/badge/demo-Hugging%20Face%20Space-102b35)](https://huggingface.co/spaces/Medo4334/atmpl-governed-automation)
 
 > Walk into an organization, run structured discovery, fill typed placeholders, and
 > ship a governed automation in days—not months. **The AI is never the final authority.**
@@ -28,11 +27,15 @@ in the demos are **synthetic and fake**.
 
 ## Verify in two minutes
 
-**Nothing to install:** <https://huggingface.co/spaces/Medo4334/atmpl-governed-automation> is
-this image, read-only. Every page below is there; nothing can be changed from it and no model
-key is spent by it.
+**A read-only public demo is built but not yet published.** `deploy/hf-space/` runs this
+image on a Hugging Face Docker Space at
+`https://huggingface.co/spaces/Medo4334/atmpl-governed-automation`, and CI re-deploys it on
+every `main` push once an `HF_TOKEN` secret exists — but publishing it needs one interactive
+`hf auth login`, so **that URL is not live yet** and this README will not pretend otherwise.
+The path below is the one that is measured.
 
-Or from a clean clone:
+From a clean clone — this exact sequence is recorded in
+[`docs/proof/clean_clone_acceptance.txt`](docs/proof/clean_clone_acceptance.txt):
 
 ```bash
 git clone https://github.com/Mohamed3042/enterprise-ai-automation-templates.git

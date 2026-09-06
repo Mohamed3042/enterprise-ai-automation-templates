@@ -39,7 +39,9 @@ with `Annotated[list[str], NoDecode]`, and now covered by a test that enumerates
 settings rather than trusting the next person to add a case
 (`docs/proof/settings_empty_list_gate.txt`).
 
-**Boundary:** Gemini is live-verified; the Anthropic and OpenAI-compatible adapters are
+**Boundary:** The read-only public demo is **built and CI-wired but not yet published** — it
+needs one interactive `hf auth login`, so its URL is not claimed as live anywhere. Gemini is
+live-verified; the Anthropic and OpenAI-compatible adapters are
 **contract-tested against recorded responses**, because no key for either exists on the machine
 this was built on — the README says exactly that rather than "supports all major providers".
 Every cost figure is an **estimate** from a price table carrying the date it was read and the
