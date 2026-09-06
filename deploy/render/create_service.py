@@ -1,6 +1,6 @@
-"""Create (or reuse) the public demo as a Render web service through the Render API, then measure it.
+"""Create (or reuse) the public demo as a Render web service through the API, then measure it.
 
-    python deploy/render/create_service.py            # create or reuse, wait until live, measure /health
+    python deploy/render/create_service.py            # create or reuse, wait for live, measure
     python deploy/render/create_service.py --check    # measure only, no writes
     python deploy/render/create_service.py --redeploy # trigger a new deploy of the existing service
 
@@ -40,7 +40,9 @@ def read_key() -> str:
         except OSError:
             key = ""
     if not key:
-        raise SystemExit("NO_KEY: set RENDER_API_KEY (Render dashboard -> Account Settings -> API Keys)")
+        raise SystemExit(
+            "NO_KEY: set RENDER_API_KEY (Render dashboard -> Account Settings -> API Keys)"
+        )
     return key
 
 
@@ -50,7 +52,11 @@ def call(key: str, method: str, path: str, body: dict | None = None) -> tuple[in
         API + path,
         data=data,
         method=method,
-        headers={"Authorization": f"Bearer {key}", "Accept": "application/json", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
     )
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
@@ -66,7 +72,9 @@ def call(key: str, method: str, path: str, body: dict | None = None) -> tuple[in
 
 def http_get(url: str, timeout: float = 60.0) -> tuple[int, str]:
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"accept": "application/json"}), timeout=timeout) as r:
+        with urllib.request.urlopen(
+            urllib.request.Request(url, headers={"accept": "application/json"}), timeout=timeout
+        ) as r:
             return r.status, r.read(200).decode(errors="replace")
     except urllib.error.HTTPError as e:
         return e.code, e.read(200).decode(errors="replace")
@@ -118,7 +126,11 @@ def wait_live(key: str, svc: dict, minutes: int = 20) -> bool:
     last = ""
     while time.time() < deadline:
         status, deploys = call(key, "GET", f"/services/{svc['id']}/deploys?limit=1")
-        d = (deploys[0].get("deploy", deploys[0]) if status == 200 and deploys else {"status": f"http {status}"})
+        d = (
+            deploys[0].get("deploy", deploys[0])
+            if status == 200 and deploys
+            else {"status": f"http {status}"}
+        )
         st = d.get("status", "?")
         if st != last:
             print(f"deploy {d.get('id', '?')} -> {st}", flush=True)
@@ -146,7 +158,9 @@ def measure(url: str) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="measure the live URL only")
-    parser.add_argument("--redeploy", action="store_true", help="trigger a new deploy of the existing service")
+    parser.add_argument(
+        "--redeploy", action="store_true", help="trigger a new deploy of the existing service"
+    )
     args = parser.parse_args()
 
     key = read_key()
@@ -159,7 +173,9 @@ def main() -> int:
     if args.redeploy:
         if not svc:
             raise SystemExit("nothing to redeploy: the service does not exist")
-        status, resp = call(key, "POST", f"/services/{svc['id']}/deploys", {"clearCache": "do_not_clear"})
+        status, resp = call(
+            key, "POST", f"/services/{svc['id']}/deploys", {"clearCache": "do_not_clear"}
+        )
         if status not in (200, 201):
             raise SystemExit(f"REDEPLOY {status}: {resp}")
         print(f"redeploy {resp.get('id')} started")
