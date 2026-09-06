@@ -93,6 +93,51 @@ class AnswersValidation(BaseModel):
     follow_ups: list[FollowUpOut]
 
 
+class DiscoveryAgentRequest(ApiModel):
+    description: str = Field(
+        min_length=20,
+        max_length=8000,
+        description="Free-text description of how the organisation runs the process.",
+    )
+    template: TEMPLATE_KEYS | None = Field(
+        default=None,
+        description="Force a template. Omitted, the agent picks one from the description.",
+    )
+    organization: str | None = Field(default=None, min_length=2, max_length=200)
+    open_session: bool = Field(
+        default=True,
+        description="Store the draft as a discovery session so a human can review and edit it.",
+    )
+
+
+class RationaleOut(BaseModel):
+    placeholder: str
+    rationale: str
+    confidence: str
+
+
+class DiscoveryAgentOut(BaseModel):
+    session_id: str | None = Field(
+        default=None,
+        description="The discovery session holding this draft, when one was opened.",
+    )
+    template: str
+    organization: str
+    answers: dict[str, Any] = Field(description="The drafted questionnaire, already validated.")
+    rationales: list[RationaleOut]
+    open_questions: list[str] = Field(
+        description="What the agent could not settle. A human answers these."
+    )
+    provider: str
+    model: str
+    boundary: str = Field(
+        default=(
+            "This is a DRAFT. Nothing was decided, approved or compiled: a human reviews the "
+            "answers and calls resolve."
+        ),
+    )
+
+
 class ResolveRequest(ApiModel):
     organization_id: str | None = Field(
         default=None,

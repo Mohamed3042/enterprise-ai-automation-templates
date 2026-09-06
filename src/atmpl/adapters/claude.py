@@ -1,58 +1,57 @@
-"""Optional Claude HTTP adapter; never selected without explicit config and key."""
+"""DEPRECATED alias. The Anthropic adapter lives in :mod:`atmpl.providers.anthropic`.
+
+``ClaudeAdapter`` remains importable and still fails closed without ``ANTHROPIC_API_KEY``;
+it now routes through :class:`~atmpl.providers.router.ProviderRouter`, so it inherits the
+retries, the timeout, the span and the cost estimate the v0.1 class did not have.
+"""
 
 from __future__ import annotations
 
-import hashlib
-import json
-import os
 from typing import Any
 
-import httpx
-
 from atmpl.models import LLMOutput
+from atmpl.providers.adapter import RouterAdapter
+from atmpl.providers.anthropic import AnthropicProvider
+from atmpl.providers.router import ProviderRouter
+from atmpl.settings import settings_from_env
 
 
 class ClaudeAdapter:
-    name = "claude"
-    model = "claude-sonnet-5"
+    name = "anthropic"
 
-    def __init__(self) -> None:
-        self.api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not self.api_key:
+    def __init__(self, settings=None, observability=None) -> None:
+        settings = settings or settings_from_env()
+        provider = AnthropicProvider(
+            model=settings.anthropic_model,
+            base_url=settings.anthropic_base_url,
+            timeout=settings.provider_timeout_seconds,
+        )
+        if not provider.configured():
             raise RuntimeError(
                 "Claude adapter requires ANTHROPIC_API_KEY; "
                 "use the offline mock adapter by default."
             )
-
-    def generate(self, task: str, payload: dict[str, Any]) -> LLMOutput:
-        canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-        response = httpx.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": self.api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": self.model,
-                "max_tokens": 1024,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": (
-                            "Return one JSON object containing only a draft, flags, "
-                            "and a recommendation. "
-                            "Never make or claim a final decision.\n"
-                            f"Task: {task}\nSanitized input: {canonical}"
-                        ),
-                    }
-                ],
-            },
-            timeout=30,
+        self.model = provider.model
+        self._adapter = RouterAdapter(
+            ProviderRouter(settings, observability=observability, providers=[provider])
         )
-        response.raise_for_status()
-        body = response.json()
-        text = body["content"][0]["text"]
-        content = json.loads(text)
-        digest = hashlib.sha256(f"{task}:{canonical}".encode()).hexdigest()
-        return LLMOutput(task=task, input_hash=digest, content=content, adapter=self.name)
+
+    def generate(
+        self,
+        task: str,
+        payload: dict[str, Any],
+        *,
+        output_schema: dict[str, Any] | None = None,
+        template_key: str | None = None,
+        organization: str | None = None,
+    ) -> LLMOutput:
+        return self._adapter.generate(
+            task,
+            payload,
+            output_schema=output_schema,
+            template_key=template_key,
+            organization=organization,
+        )
+
+
+__all__ = ["ClaudeAdapter"]

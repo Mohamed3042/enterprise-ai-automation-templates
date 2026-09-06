@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -26,6 +27,8 @@ from atmpl.models import (
     SignedHumanDecision,
     StageStatus,
 )
+from atmpl.telemetry import Observability, call_context, guardrail_span, run_span, stage_span
+from atmpl.telemetry.tracing import mark_allowed, mark_blocked
 
 TERMINAL_STAGE_STATUSES = {StageStatus.COMPLETED.value, StageStatus.REJECTED.value}
 
@@ -51,13 +54,21 @@ class AutomationEngine:
         database: Database,
         audit_path: Path,
         adapter: LLMAdapter | None = None,
+        observability: Observability | None = None,
     ) -> None:
         self.database = database
         self.audit = AuditLog(audit_path, database.session)
-        self.adapter = adapter or create_adapter()
+        self.observability = observability
+        self.adapter = adapter or create_adapter(observability=observability)
         self.policy = DeterministicPolicyEngine()
         #: Set by the web application so state changes and their events commit together.
         self.event_sink: EventSink | None = None
+
+    def _count_guardrail(self, phase: str, guardrail: str, decision: str) -> None:
+        if self.observability is not None:
+            self.observability.metrics.guardrail_decisions.labels(
+                phase, guardrail, decision
+            ).inc()
 
     def _emit(
         self,
@@ -79,6 +90,20 @@ class AutomationEngine:
             run_id=run_id,
             stage_id=stage_id,
         )
+
+    def _risk_tier_of(self, run_id: str, stage_key: str) -> str:
+        with self.database.session() as session:
+            stage = session.scalar(
+                select(Stage).where(Stage.run_id == run_id, Stage.stage_key == stage_key)
+            )
+            return stage.risk_tier if stage else "UNKNOWN"
+
+    def _mark_call_guardrail(self, run_id: str, stage_key: str, decision: str) -> None:
+        """Tie the guardrail verdict back to the model call whose output it judged."""
+        if self.observability is not None:
+            self.observability.calls.mark_guardrail(
+                run_id=run_id, stage_key=stage_key, decision=decision
+            )
 
     def create_organization(
         self,
@@ -148,6 +173,32 @@ class AutomationEngine:
         evidence: dict[str, Any] | None = None,
     ) -> Run:
         stage_overrides = stage_overrides or {}
+        with run_span(run_id=run_id or "pending", operation="start") as span:
+            run = self._start_run(
+                workflow_id=workflow_id,
+                title=title,
+                region=region,
+                run_id=run_id,
+                stage_overrides=stage_overrides,
+                evidence=evidence,
+            )
+            span.set_attribute("atmpl.run_id", run.id)
+            if self.observability is not None:
+                self.observability.metrics.runs_started.labels(
+                    self.template_of(run.id) or "unknown"
+                ).inc()
+            return run
+
+    def _start_run(
+        self,
+        *,
+        workflow_id: str,
+        title: str,
+        region: str,
+        run_id: str | None,
+        stage_overrides: dict[str, dict[str, Any]],
+        evidence: dict[str, Any] | None,
+    ) -> Run:
         with self.database.session() as session:
             workflow = session.get(Workflow, workflow_id)
             if not workflow:
@@ -263,7 +314,36 @@ class AutomationEngine:
             detail=detail,
         )
 
+    def template_of(self, run_id: str) -> str | None:
+        """The source template a run came from — the LLMOps page groups by it."""
+        with self.database.session() as session:
+            run = session.get(Run, run_id)
+            return run.workflow.template_id if run and run.workflow else None
+
     def process_ai_stage(
+        self,
+        run_id: str,
+        stage_key: str,
+        payload: dict[str, Any],
+    ) -> EngineResult:
+        """Draft one AI stage under a span tree: run -> stage -> guardrail | llm.call."""
+        template_key = self.template_of(run_id)
+        with ExitStack() as scope:
+            scope.enter_context(run_span(run_id=run_id, operation="stage"))
+            scope.enter_context(
+                stage_span(stage_key=stage_key, **{"atmpl.template_key": template_key})
+            )
+            scope.enter_context(
+                call_context(
+                    run_id=run_id,
+                    stage_key=stage_key,
+                    template_key=template_key,
+                    purpose="stage_draft",
+                )
+            )
+            return self._draft_ai_stage(run_id, stage_key, payload)
+
+    def _draft_ai_stage(
         self,
         run_id: str,
         stage_key: str,
@@ -308,41 +388,57 @@ class AutomationEngine:
             allowed_scope = set(stage.input_data.get("allowed_actions", [])) or None
             output_schema = dict(stage.output_schema)
 
-        preflight = self.policy.preflight(
-            payload,
-            allowed_region=allowed_region,
-            allowed_scope=allowed_scope,
-        )
-        if not preflight.allowed:
-            violation = preflight.violations[0]
-            return self._block(
-                run_id=run_id,
-                stage_key=stage_key,
-                guardrail=violation.guardrail,
-                code=violation.code,
-                detail=violation.message,
+        with guardrail_span(phase="preflight", **{"atmpl.stage_key": stage_key}) as span:
+            preflight = self.policy.preflight(
+                payload,
+                allowed_region=allowed_region,
+                allowed_scope=allowed_scope,
             )
+            if not preflight.allowed:
+                violation = preflight.violations[0]
+                mark_blocked(span, violation.guardrail, violation.message)
+                self._count_guardrail("preflight", violation.guardrail, "blocked")
+                return self._block(
+                    run_id=run_id,
+                    stage_key=stage_key,
+                    guardrail=violation.guardrail,
+                    code=violation.code,
+                    detail=violation.message,
+                )
+            mark_allowed(span)
+            self._count_guardrail("preflight", G1_RISK_TIERS, "allowed")
 
-        output = self.adapter.generate(stage_key, preflight.sanitized)
+        output = self.adapter.generate(
+            stage_key,
+            preflight.sanitized,
+            output_schema=output_schema,
+        )
         required_fields = set(output_schema.get("required", []))
         bounds = {
             name: (float(values[0]), float(values[1]))
             for name, values in output_schema.get("numeric_bounds", {}).items()
         }
-        postflight = self.policy.postflight(
-            output.content,
-            required_fields=required_fields,
-            numeric_bounds=bounds,
-        )
-        if not postflight.allowed:
-            violation = postflight.violations[0]
-            return self._block(
-                run_id=run_id,
-                stage_key=stage_key,
-                guardrail=violation.guardrail,
-                code=violation.code,
-                detail=violation.message,
+        with guardrail_span(phase="postflight", **{"atmpl.stage_key": stage_key}) as span:
+            postflight = self.policy.postflight(
+                output.content,
+                required_fields=required_fields,
+                numeric_bounds=bounds,
             )
+            if not postflight.allowed:
+                violation = postflight.violations[0]
+                mark_blocked(span, violation.guardrail, violation.message)
+                self._count_guardrail("postflight", violation.guardrail, "blocked")
+                self._mark_call_guardrail(run_id, stage_key, "blocked")
+                return self._block(
+                    run_id=run_id,
+                    stage_key=stage_key,
+                    guardrail=violation.guardrail,
+                    code=violation.code,
+                    detail=violation.message,
+                )
+            mark_allowed(span)
+            self._count_guardrail("postflight", G1_RISK_TIERS, "allowed")
+            self._mark_call_guardrail(run_id, stage_key, "allowed")
 
         with self.database.session() as session:
             stage = self._stage(session, run_id, stage_key)
@@ -408,6 +504,34 @@ class AutomationEngine:
         (``human:<user>`` or ``client:<id>``); it is bound into the hash chain beside the
         decision so a later reviewer sees who was logged in, not only who was typed.
         """
+        with ExitStack() as scope:
+            scope.enter_context(run_span(run_id=run_id, operation="decision"))
+            scope.enter_context(stage_span(stage_key=stage_key))
+            span = scope.enter_context(
+                guardrail_span(phase="authority", **{"atmpl.stage_key": stage_key})
+            )
+            try:
+                result = self._record_decision(run_id, stage_key, decision, principal=principal)
+            except GuardrailRejection as exc:
+                mark_blocked(span, exc.guardrail, str(exc))
+                self._count_guardrail("authority", exc.guardrail, "blocked")
+                raise
+            mark_allowed(span)
+            self._count_guardrail("authority", result.guardrail or G1_RISK_TIERS, "allowed")
+            if self.observability is not None:
+                self.observability.metrics.stage_decisions.labels(
+                    self._risk_tier_of(run_id, stage_key), decision.decision.value
+                ).inc()
+            return result
+
+    def _record_decision(
+        self,
+        run_id: str,
+        stage_key: str,
+        decision: SignedHumanDecision,
+        *,
+        principal: str | None = None,
+    ) -> EngineResult:
         with self.database.session() as session:
             stage = self._stage(session, run_id, stage_key)
             try:

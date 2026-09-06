@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Evals{% endblock %}
+{% block content %}
+<section class="page-header page-shell redteam-header">
+  <p class="eyebrow">MEASURED ADVERSARIAL EVIDENCE</p>
+  <div class="header-row">
+    <div>
+      <h1>Evals</h1>
+      {% if report %}
+      <p>
+        {{ report.totals.cases }} cases, scored deterministically against
+        <code>{{ report.provider }}</code> ({{ report.model }}) on {{ report.finished_at[:19] }}.
+        The gated categories are the ones CI refuses to ship without.
+      </p>
+      {% else %}
+      <p>No report has been produced in this deployment yet. Run <code>python -m atmpl evals run</code>.</p>
+      {% endif %}
+    </div>
+    {% if report %}
+    <span class="blocked-score">{{ "%.0f%%"|format(report.totals.gated_pass_rate * 100) }} GATED PASS</span>
+    {% endif %}
+  </div>
+</section>
+
+{% if report %}
+<section class="metric-grid page-shell" aria-label="Eval totals">
+  <article><strong>{{ report.totals.passed }}</strong><span>cases passed</span></article>
+  <article><strong>{{ report.totals.failed }}</strong><span>failed</span></article>
+  <article><strong>{{ report.totals.errored }}</strong><span>errored</span></article>
+  <article><strong>{{ report.totals.skipped }}</strong><span>skipped (not scored)</span></article>
+</section>
+
+<section class="section page-shell" id="by-category">
+  <div class="section-heading">
+    <div><p class="eyebrow">BY CATEGORY</p><h2>What was measured</h2></div>
+    <p>A gated category must be perfect before a build is allowed through: <code>atmpl evals gate --min-pass 1.0</code>.</p>
+  </div>
+  <div class="table-wrap">
+    <table class="selectable" data-selectable>
+      <thead><tr><th>Category</th><th>Cases</th><th>Pass</th><th>Fail</th><th>Error</th><th>Skipped</th><th>Gated</th></tr></thead>
+      <tbody>
+      {% for name, entry in report.by_category.items() %}
+        <tr tabindex="0">
+          <td><code>{{ name }}</code></td>
+          <td>{{ entry.total }}</td>
+          <td>{{ entry["pass"] }}</td>
+          <td>{{ entry.fail }}</td>
+          <td>{{ entry.error }}</td>
+          <td>{{ entry.skipped }}</td>
+          <td>{{ "yes" if entry.gated else "no" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section page-shell" id="every-case">
+  <div class="section-heading">
+    <div><p class="eyebrow">EVERY CASE</p><h2>Expected against observed</h2></div>
+    <p>
+      Cases expecting <code>allowed</code> are not oversights: a gate that refuses everything
+      passes every attack, so the suite measures the false-positive side too. Cases marked
+      <em>boundary</em> in <code>docs/evals.md</code> document where a deterministic filter ends.
+    </p>
+  </div>
+  <div class="table-wrap">
+    <table class="selectable" data-selectable>
+      <thead><tr><th>Id</th><th>Case</th><th>Category</th><th>Expected</th><th>Observed</th><th>Latency</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for case in report.cases %}
+        <tr tabindex="0">
+          <td><code>{{ case.id }}</code></td>
+          <td dir="auto">{{ case.title }}</td>
+          <td>{{ case.category }}</td>
+          <td>{{ case.expected }}</td>
+          <td>{{ case.observed }}</td>
+          <td>{{ "%.1f ms"|format(case.latency_ms) }}</td>
+          <td><span class="status {{ 'delivered' if case.status == 'pass' else ('pending' if case.status == 'skipped' else 'dead_letter') }}">{{ case.status }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="section page-shell" id="redteam-contracts">
+  <div class="section-heading">
+    <div><p class="eyebrow">THE ORIGINAL CONTRACTS</p><h2>R1–R8, as executed in this deployment</h2></div>
+    <p>These rows come from the database this deployment seeded; the eval report above runs the same contracts and scores them.</p>
+  </div>
+  <div class="redteam-grid">
+  {% for result in results %}
+    <article>
+      <div><span class="case-id">{{ result.case_id }}</span><span class="demo-tag">{{ result.demo }}</span></div>
+      <h2>{{ result.expectation }}</h2>
+      <p>{{ result.detail }}</p>
+      <strong class="blocked-status">✓ {{ result.status }}</strong>
+    </article>
+  {% else %}
+    <p class="muted">No red-team results are stored in this deployment yet.</p>
+  {% endfor %}
+  </div>
+</section>
+{% endblock %}

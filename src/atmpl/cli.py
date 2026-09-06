@@ -15,13 +15,22 @@ import uvicorn
 import yaml
 from sqlalchemy import inspect, select
 
+from atmpl.agents.discovery import AgentRefused, run_discovery
 from atmpl.audit import verify_audit
-from atmpl.demos import seed_demo_data, seed_demo_subscription, seed_inbound_sources
+from atmpl.demos import (
+    exercise_demos,
+    seed_demo_data,
+    seed_demo_subscription,
+    seed_inbound_sources,
+)
 from atmpl.engine.database import ApiKey, Database
 from atmpl.engine.service import AutomationEngine
+from atmpl.evals.runner import NoCasesFound, run_suite, write_report
 from atmpl.intake.resolver import DiscoveryError, init_discovery, resolve_discovery
 from atmpl.migrate import current_revision, upgrade_database
 from atmpl.models import AI_ACTIONS, InstantiatedWorkflow
+from atmpl.providers.base import Message, ProviderError
+from atmpl.providers.router import ProviderRouter
 from atmpl.redteam.contracts import run_all
 from atmpl.runtime import build_context
 from atmpl.security.credentials import (
@@ -32,6 +41,7 @@ from atmpl.security.credentials import (
     revoke_api_key,
 )
 from atmpl.settings import Settings, settings_from_env
+from atmpl.telemetry import build_observability
 from atmpl.web.app import create_app
 from atmpl.webhooks.outbox import deliver_pending
 
@@ -74,8 +84,59 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Keep /api/v1 credential-only even in the keyless demo.",
     )
+    demo_up.add_argument(
+        "--exercise",
+        action="store_true",
+        help=(
+            "Draft one AI stage per demo at start-up, so /llmops and /metrics show real "
+            "calls rather than an empty deployment. Used by the hosted read-only demo."
+        ),
+    )
 
     subcommands.add_parser("redteam", help="Execute R1-R8 across all three demos.")
+
+    evals = subcommands.add_parser("evals", help="Scored eval suite over the guardrails.")
+    evals_subcommands = evals.add_subparsers(dest="evals_command", required=True)
+    evals_run = evals_subcommands.add_parser("run", help="Run every case and write a report.")
+    evals_run.add_argument(
+        "--provider",
+        default=None,
+        help="Override the configured provider for this run (e.g. mock, gemini).",
+    )
+    evals_run.add_argument("--out", type=Path, default=Path("var") / "evals")
+    evals_run.add_argument("--only", nargs="*", default=None, help="Run only these case ids.")
+    evals_gate = evals_subcommands.add_parser(
+        "gate",
+        help="Fail the build when the gated categories drop below a pass rate.",
+    )
+    evals_gate.add_argument("--min-pass", type=float, default=1.0)
+    evals_gate.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        help="Score an existing report instead of running the suite again.",
+    )
+
+    discover = subcommands.add_parser(
+        "discover",
+        help="Draft a typed questionnaire from a free-text process description.",
+    )
+    discover.add_argument("--text", required=True, help="The process description.")
+    discover.add_argument("--template", default=None, choices=["retail", "ministry", "bank"])
+    discover.add_argument("--org", default=None, help="Organization name for the draft.")
+    discover.add_argument("--output", type=Path, default=None, help="Write answers.yaml here.")
+
+    providers = subcommands.add_parser("providers", help="Which model providers are wired up.")
+    providers_subcommands = providers.add_subparsers(dest="providers_command", required=True)
+    providers_check = providers_subcommands.add_parser(
+        "check",
+        help="Print the provider chain, its configuration state and an optional live ping.",
+    )
+    providers_check.add_argument(
+        "--ping",
+        action="store_true",
+        help="Make one real, minimal call to each configured provider.",
+    )
 
     audit = subcommands.add_parser("audit", help="Operate on the hash-chained audit ledger.")
     audit_subcommands = audit.add_subparsers(dest="audit_command", required=True)
@@ -216,8 +277,12 @@ def _command_demo_up(args: argparse.Namespace) -> int:
     database = Database(settings.database_url, create_all=settings.create_schema_on_start)
     engine = seed_demo_data(root / "demo.db", root / "audit.jsonl", database=database)
     inbound = seed_inbound_sources(engine)
+    # One set of instruments for the whole process: the calls made below have to be the
+    # same ones the served /llmops page reads, or the page reports an idle deployment.
+    observability = build_observability(settings)
+    context = build_context(engine, settings, observability=observability)
+    resolver = context.secrets
     # A provider-configured secret wins at verification time, so print what a caller must use.
-    resolver = build_context(engine, settings).secrets
     inbound = {
         source: resolver.get(f"webhook_inbound_{source}") or secret
         for source, secret in inbound.items()
@@ -234,6 +299,14 @@ def _command_demo_up(args: argparse.Namespace) -> int:
     )
 
     print("SEEDED: retail + ministry + bank (synthetic, deterministic, offline)")
+    if args.exercise:
+        for outcome in exercise_demos(engine):
+            if "error" in outcome:
+                print(f"EXERCISED: {outcome['stage']} FAILED - {outcome['error']}")
+            else:
+                print(f"EXERCISED: {outcome['stage']} -> {outcome['status']} ({outcome['run_id']})")
+        totals = observability.calls.totals()
+        print(f"MODEL CALLS AT START-UP: {totals['calls']} on the {settings.adapter} provider")
     print(f"DATABASE: {settings.database_url} (migrations at {revision})")
     print(f"DASHBOARD: http://{args.host}:{args.port}")
     print(f"API DOCS:  http://{args.host}:{args.port}/api/v1/docs")
@@ -244,8 +317,10 @@ def _command_demo_up(args: argparse.Namespace) -> int:
     if subscription_id:
         print(f"WEBHOOK OUT: every event -> {receiver_url} (subscription {subscription_id})")
     print(f"(inbound secrets also written to {DEMO_SECRETS_FILE})")
+    if settings.demo_readonly:
+        print("MODE: READ-ONLY public demo - every mutation is refused (ATMPL_DEMO_READONLY=1)")
     uvicorn.run(
-        create_app(engine, settings),
+        create_app(engine, settings, observability=observability),
         host=args.host,
         port=args.port,
         log_level="info",
@@ -260,6 +335,137 @@ def _command_redteam() -> int:
     blocked = sum(outcome.status == "BLOCKED" for outcome in outcomes)
     print(f"REDTEAM: {blocked}/{len(outcomes)} BLOCKED")
     return 0 if blocked == len(outcomes) else 1
+
+
+
+def _command_evals(args: argparse.Namespace) -> int:
+    if args.evals_command == "run":
+        try:
+            report = run_suite(provider=args.provider, only=args.only)
+        except NoCasesFound as exc:
+            print(f"EVALS REFUSED: {exc}")
+            return 2
+        json_path, md_path = write_report(report, args.out)
+        totals = report.as_dict()["totals"]
+        print(f"EVALS: {report.provider} ({report.model}) - {len(report.outcomes)} case(s)")
+        for name, entry in report.by_category().items():
+            print(
+                f"  {name:<18} {entry['pass']}/{entry['total']} pass"
+                f"  fail={entry['fail']} error={entry['error']} skipped={entry['skipped']}"
+            )
+        for outcome in report.outcomes:
+            if outcome.status in {"fail", "error"}:
+                print(f"  FAILED {outcome.id}: {'; '.join(outcome.reasons) or outcome.detail}")
+        print(
+            f"PASS RATE: {totals['pass_rate']:.3f} "
+            f"({totals['passed']}/{totals['scored']} scored, {totals['skipped']} skipped)"
+        )
+        print(f"GATED PASS RATE: {totals['gated_pass_rate']:.3f}")
+        print(f"REPORT: {json_path}")
+        print(f"SUMMARY: {md_path}")
+        return 0 if totals["failed"] == 0 and totals["errored"] == 0 else 1
+
+    if args.report:
+        payload = json.loads(args.report.read_text(encoding="utf-8"))
+        rate = float(payload["totals"]["gated_pass_rate"])
+        failures = [
+            case
+            for case in payload["cases"]
+            if case["gated"] and case["status"] in {"fail", "error"}
+        ]
+        source = str(args.report)
+    else:
+        try:
+            report = run_suite()
+        except NoCasesFound as exc:
+            print(f"GATE FAIL: {exc}")
+            return 1
+        rate = report.gated_pass_rate
+        failures = [
+            {"id": o.id, "reasons": o.reasons}
+            for o in report.gated_outcomes
+            if o.status in {"fail", "error"}
+        ]
+        source = "a fresh run"
+    if rate < args.min_pass:
+        print(f"GATE FAIL: gated pass rate {rate:.3f} < required {args.min_pass:.3f} ({source})")
+        for case in failures:
+            print(f"  {case['id']}: {'; '.join(case.get('reasons') or []) or 'failed'}")
+        return 1
+    print(f"GATE PASS: gated pass rate {rate:.3f} >= required {args.min_pass:.3f} ({source})")
+    return 0
+
+
+def _command_discover(args: argparse.Namespace) -> int:
+    settings = settings_from_env()
+    observability = build_observability(settings, install=False)
+    router = ProviderRouter(settings, observability=observability)
+    print(f"PROVIDER: {router.primary.name} ({router.primary.model})")
+    try:
+        result = run_discovery(
+            router,
+            description=args.text,
+            template=args.template,
+            organization=args.org,
+        )
+    except AgentRefused as exc:
+        print(f"REFUSED: {exc}")
+        for index, item in enumerate(exc.follow_ups, start=1):
+            print(f"  {index}. {item.get('placeholder')}: {item.get('problem')}")
+        return 2
+    print(f"TEMPLATE: {result.template}")
+    print(f"ORGANIZATION: {result.organization}")
+    print(yaml.safe_dump(result.answers, sort_keys=False, allow_unicode=True).rstrip())
+    if result.open_questions:
+        print("OPEN QUESTIONS (a human still has to settle these):")
+        for question in result.open_questions:
+            print(f"  - {question}")
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            yaml.safe_dump(result.answers, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        print(f"ANSWERS: {args.output}")
+    totals = observability.calls.totals()
+    print(
+        f"MODEL CALLS: {totals['calls']} "
+        f"({totals['tokens_in']} in / {totals['tokens_out']} out tokens, "
+        f"estimated ${totals['cost_estimate_usd']:.6f})"
+    )
+    print("This is a DRAFT questionnaire. A human reviews it before `resolve` compiles it.")
+    return 0
+
+
+def _command_providers(args: argparse.Namespace) -> int:
+    settings = settings_from_env()
+    router = ProviderRouter(settings, observability=build_observability(settings, install=False))
+    prices = router.prices
+    print(f"PRICE TABLE: as of {prices.as_of} (estimates only, not billing)")
+    for status in router.status():
+        state = "configured" if status.configured else "NOT CONFIGURED (no key)"
+        priced = "priced" if prices.knows(status.name, status.model) else "not priced"
+        print(
+            f"{status.role:<8} {status.name:<10} {status.model:<24} "
+            f"{state:<24} breaker={status.breaker} {priced}"
+        )
+    if not args.ping:
+        print("(add --ping to make one real call to each configured provider)")
+        return 0
+    for provider in router.chain:
+        if not provider.configured():
+            print(f"PING {provider.name}: skipped, not configured")
+            continue
+        try:
+            result = provider.complete([Message("user", "Reply with the single word: ready")])
+        except ProviderError as exc:
+            print(f"PING {provider.name}: FAILED ({exc.kind}) {exc.detail[:120]}")
+            continue
+        print(
+            f"PING {provider.name}: ok in {result.latency_ms:.0f} ms, "
+            f"{result.usage.input_tokens} in / {result.usage.output_tokens} out tokens"
+        )
+    return 0
 
 
 def _command_audit_verify(args: argparse.Namespace) -> int:
@@ -413,6 +619,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _command_demo_up(args)
     if args.command == "redteam":
         return _command_redteam()
+    if args.command == "evals":
+        return _command_evals(args)
+    if args.command == "discover":
+        return _command_discover(args)
+    if args.command == "providers":
+        return _command_providers(args)
     if args.command == "audit" and args.audit_command == "verify":
         return _command_audit_verify(args)
     if args.command == "db":

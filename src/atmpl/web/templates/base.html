@@ -20,7 +20,8 @@
         <a href="/approvals">Approvals</a>
         <a href="/webhooks">Webhooks</a>
         <a href="/audit">Audit</a>
-        <a href="/redteam">Red team</a>
+        <a href="/llmops">LLMOps</a>
+        <a href="/evals">Evals</a>
         <a href="/api/v1/docs">API</a>
       </nav>
       <div class="identity">
@@ -36,7 +37,13 @@
     <div class="synthetic-banner">
       SYNTHETIC DEMO · Every organization, person, record, and event shown here is fake.
     </div>
-    {% if demo_mode %}
+    {% if demo_readonly %}
+    <div class="demo-banner" role="status">
+      READ-ONLY PUBLIC DEMO — you can open every page; nothing can be changed from here and no
+      model key is spent. Run it locally to decide:
+      <code>docker run -p 8000:8000 ghcr.io/mohamed3042/enterprise-ai-automation-templates:latest</code>
+    </div>
+    {% elif demo_mode %}
     <div class="demo-banner" role="status">
       DEMO MODE — no login; decisions are recorded as <code>human:demo</code>.
       Set <code>ATMPL_ADMIN_USER</code> and <code>ATMPL_ADMIN_PASSWORD_HASH</code> to require a sign-in.

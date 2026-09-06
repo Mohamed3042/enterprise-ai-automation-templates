@@ -55,7 +55,8 @@ def main() -> None:
         ),
         ("pending-approvals.png", "/approvals", "Pending approvals"),
         ("audit-verify.png", "/audit", "CHAIN VERIFIED"),
-        ("redteam-results.png", "/redteam", "24 / 24 attacks blocked"),
+        ("evals-report.png", "/evals", "Expected against observed"),
+        ("llmops-page.png", "/llmops", "What each model actually did"),
         ("webhook-deliveries.png", "/webhooks", "Delivery attempts"),
         ("api-docs.png", "/api/v1/docs", "Enterprise AI Automation Templates API"),
     )

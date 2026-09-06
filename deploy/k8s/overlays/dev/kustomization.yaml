@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: atmpl-dev
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+patches:
+  - path: deployment.yaml
+  - path: configmap.yaml
+
+# The dev overlay is the one CI runs on kind, so it must stand up with no database, no
+# secrets and no ingress controller. SQLite on an emptyDir is exactly that: one replica,
+# state that lives as long as the pod, and nothing to provision.
+images:
+  - name: ghcr.io/mohamed3042/enterprise-ai-automation-templates
+    newTag: latest

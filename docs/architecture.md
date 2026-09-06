@@ -8,16 +8,26 @@ flowchart TB
     approver["Authorized human<br/><i>owns MEDIUM and HIGH decisions</i>"]
     caller["Calling system<br/><i>helpdesk, case intake, ERP</i>"]
     receiver["Subscribed receiver<br/><i>hears what the human decided</i>"]
+    operator["Platform operator<br/><i>watches latency, cost, guardrail trips</i>"]
     atmpl["<b>ATMPL</b><br/>governed automation platform"]
-    provider["LLM provider<br/><i>optional; the mock is the default</i>"]
+    provider["LLM provider<br/><i>Gemini · Anthropic · OpenAI-compatible<br/>the mock is the default</i>"]
+    collector["Trace collector<br/><i>OTLP; optional</i>"]
+    prom["Prometheus<br/><i>scrapes /metrics</i>"]
 
-    consultant -->|CLI, /api/v1/discovery| atmpl
+    consultant -->|CLI, /api/v1/discovery, the discovery agent| atmpl
     approver -->|dashboard sign-in, signed decision| atmpl
     caller -->|signed inbound webhook| atmpl
+    operator -->|/llmops, /evals| atmpl
     atmpl -->|signed outbound delivery| receiver
     atmpl -->|redacted, scoped prompt| provider
     provider -->|draft, flags, recommendation| atmpl
+    atmpl -.->|spans| collector
+    prom -.->|scrape| atmpl
 ```
+
+The provider is chosen by the **deployment**, never by a caller (invariant G7). There is no
+field in which to send a model name, and adding one would be a breaking change to that
+invariant rather than a feature.
 
 ## C4 level 2 — containers
 
@@ -29,19 +39,57 @@ flowchart TB
     subgraph service["ATMPL container (non-root, :8000)"]
         api["/api/v1<br/><i>OpenAPI, scoped auth</i>"]
         engine["Execution engine<br/><i>G1-G7 guardrails</i>"]
+        agent["Discovery agent<br/><i>PydanticAI, typed output</i>"]
+        router["Provider router<br/><i>chain, retries, breaker, cost</i>"]
         worker["Delivery worker<br/><i>outbox drain, backoff</i>"]
+        obs["Observability<br/><i>spans · /metrics · call ledger</i>"]
     end
     store[("PostgreSQL or SQLite<br/><i>runs, stages, credentials, outbox</i>")]
     ledger[("Append-only JSONL<br/><i>SHA-256 hash chain</i>")]
     receiver["Receiver"]
+    provider["Model provider"]
 
     dash --> api
     api --> engine
+    api --> agent
+    agent --> router
+    engine --> router
+    router -->|HTTPS| provider
+    router --> obs
+    engine --> obs
     engine --> store
     engine --> ledger
     worker --> store
     worker -->|HMAC-signed POST| receiver
 ```
+
+Every model call in the container goes through one object. That is what makes the LLMOps page
+a measurement rather than a claim: there is no second path to a provider that could miss the
+span, the counter, the cost estimate or the ledger row.
+
+## C4 level 3 — one governed run, as a trace
+
+```mermaid
+flowchart TB
+    run["<b>atmpl.run</b><br/>run_id · operation"]
+    stage["<b>atmpl.stage</b><br/>stage_key · risk_tier · template_key"]
+    pre["<b>atmpl.guardrail</b><br/>phase=preflight · decision"]
+    call["<b>atmpl.llm.call</b><br/>provider · model · tokens · latency · cost_estimate"]
+    post["<b>atmpl.guardrail</b><br/>phase=postflight · decision"]
+
+    run --> stage
+    stage --> pre
+    stage --> call
+    stage --> post
+```
+
+A blocked preflight produces **no** `atmpl.llm.call` child — that absence is the evidence the
+payload never reached a model, and `tests/test_telemetry.py` asserts the shape rather than the
+count. A human decision produces `atmpl.run → atmpl.stage → atmpl.guardrail(phase=authority)`.
+
+The call span carries `atmpl.provider`, `atmpl.model`, `atmpl.tokens_in`, `atmpl.tokens_out`,
+`atmpl.latency_ms`, `atmpl.cost_estimate_usd`, `atmpl.attempt`, `atmpl.outcome` and
+`atmpl.purpose`, beside the run, stage and template it belongs to.
 
 ## Trust boundaries
 
@@ -52,7 +100,11 @@ flowchart TB
 | Browser → dashboard mutation | A signed session cookie **and** a matching CSRF token | `web/app.py` |
 | Any caller → a MEDIUM/HIGH transition | A `SignedHumanDecision` whose role is in the stage's authority matrix | `guardrails/decisions.py` |
 | Engine → LLM provider | Deterministic pre-policy: redaction, region, scope, injection | `guardrails/policy.py` |
+| Caller → provider selection | Nothing crosses it: the chain is a settings value (G7) | `settings.py`, `providers/router.py` |
 | LLM provider → engine | Deterministic post-policy: schema, bounds, size, forbidden content | `guardrails/policy.py` |
+| Agent → the questionnaire | The template's own placeholder model; an undeclared field is refused | `agents/discovery.py` |
+| Internet → `/metrics` | Nothing by default: counts only, never payloads. A NetworkPolicy is the control | `deploy/k8s/base/networkpolicy.yaml` |
+| Public demo → any mutation | Refused outright while `ATMPL_DEMO_READONLY=1` | `web/app.py` |
 | Service → subscriber | A signature the receiver verifies with its own copy of the secret | `webhooks/outbox.py` |
 | Anything → the ledger | Nothing: it is append-only, and every record hashes the one before | `audit.py` |
 
@@ -111,6 +163,10 @@ component inside that workflow; it is not the workflow controller or policy auth
 | Audit ledger | Append-only ordered evidence and tamper detection | Data-retention policy for a real client |
 | Dashboard | Read models and calls to the shared engine mutation API | Dashboard-only approval logic |
 | `/api/v1` | Versioned resources, scopes, the error envelope, pagination | A second copy of any rule the engine owns |
+| Provider router | Chain order, retries, timeouts, the circuit breaker, cost estimation | Which provider a *caller* would like |
+| Discovery agent | Turning prose into a draft questionnaire, with a reason per field | Deciding, approving, or adding a field |
+| Eval suite | Scoring observed decisions against declared expectations | Judging quality with a model |
+| Observability | Spans, counters, the model-call ledger | Persisting model calls past a restart |
 | Credential store | Salted digests of API keys and client secrets, PBKDF2 passwords | Recoverable credentials |
 | Webhook outbox | Durable events, fan-out, retries, receipts, dead-letter | Deciding what an event means |
 
@@ -181,9 +237,37 @@ The system fails closed:
 - receiver down or failing → retries with backoff, then `dead_letter` for a human — never a
   silently dropped event.
 
-## Where the next layer attaches [INFERRED]
+## Observability: what is measured, and where it lives
 
-`AppContext` (`runtime.py`) is the single place a request handler reaches for the engine,
-settings, secrets and limiter, so tracing, metrics and a provider router belong there rather
-than in a module global. Provider selection is already a settings value (`ATMPL_ADAPTER`), and
-the engine emits every domain event through one `event_sink` seam.
+| Signal | Where it comes from | Survives a restart |
+|---|---|---|
+| Traces (`atmpl.run` → `atmpl.stage` → guardrail / model call) | The engine and the router, through OpenTelemetry | Only with an OTLP collector configured |
+| `/metrics` | Prometheus counters and histograms on the same code paths | No — a process counter is per-process |
+| `/llmops` model-call table | The in-process call ledger, a bounded ring buffer | **No**, and the page says so |
+| `/llmops` approvals against blocks | A query over `runs` and `stages` | **Yes** |
+| `/evals` | The last report `atmpl evals run` wrote | Yes, as a file |
+| The audit ledger | `audit.py`, hash-chained | Yes — this is the evidence; the rest is telemetry |
+
+Two of those rows are the point. A model call is *operational telemetry* and may disappear on
+restart; a governed transition is *evidence* and may not. They live in different stores, and
+the page says which one it is reading.
+
+`ATMPL_TRACE_EXPORTER=none` (the default) still records spans in-process — nothing leaves the
+container, no collector is required, and `/llmops` still shows a real trace. `console` prints
+them; `otlp` ships them, and `docker compose --profile tracing up` starts a Jaeger that
+receives them. `docs/proof/screenshots/jaeger-trace.png` is that view of one real run.
+
+## Deployment topologies
+
+| Where | What runs | What it is for |
+|---|---|---|
+| `python -m atmpl demo up` | SQLite, mock provider, no keys | The two-minute local walkthrough |
+| `docker compose up` | PostgreSQL, the published image, an optional receiver and Jaeger | The integration story on one machine |
+| `deploy/k8s/overlays/dev` | One replica, SQLite on an emptyDir | What CI stands up on kind every push |
+| `deploy/k8s/overlays/prod` | Two replicas, a migrate init container, Postgres from a Secret, HPA, NetworkPolicy | The shape a real cluster would take |
+| `deploy/hf-space` | The published image, read-only, port 7860 | The public URL a reviewer opens |
+
+**[INFERRED]** A production deployment would still add an object-locked audit sink, identity
+claims from a real IdP, a KMS for the signing keys, a shared rate-limit store, backup/restore
+and documented retention. The rate limiter is per-process: with two replicas the effective
+ceiling is twice the configured one, which `SECURITY.md` states rather than implies.

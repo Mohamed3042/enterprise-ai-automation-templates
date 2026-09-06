@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atmpl-config
+data:
+  ATMPL_AUTO_CREATE_SCHEMA: "false"
+  ATMPL_DEMO_OPEN_API: "0"
+  ATMPL_HSTS_ENABLED: "1"
+  ATMPL_TRACE_EXPORTER: "otlp"
+  # The single-process rate limiter protects one replica, not the fleet: with two replicas
+  # the effective ceiling is twice this. SECURITY.md says so rather than leaving it implied.
+  ATMPL_RATE_LIMIT: "120/minute"

@@ -399,6 +399,128 @@
         "title": "DeliveryOut",
         "type": "object"
       },
+      "DiscoveryAgentOut": {
+        "properties": {
+          "answers": {
+            "additionalProperties": true,
+            "description": "The drafted questionnaire, already validated.",
+            "title": "Answers",
+            "type": "object"
+          },
+          "boundary": {
+            "default": "This is a DRAFT. Nothing was decided, approved or compiled: a human reviews the answers and calls resolve.",
+            "title": "Boundary",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "open_questions": {
+            "description": "What the agent could not settle. A human answers these.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "organization": {
+            "title": "Organization",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "rationales": {
+            "items": {
+              "$ref": "#/components/schemas/RationaleOut"
+            },
+            "title": "Rationales",
+            "type": "array"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The discovery session holding this draft, when one was opened.",
+            "title": "Session Id"
+          },
+          "template": {
+            "title": "Template",
+            "type": "string"
+          }
+        },
+        "required": [
+          "template",
+          "organization",
+          "answers",
+          "rationales",
+          "open_questions",
+          "provider",
+          "model"
+        ],
+        "title": "DiscoveryAgentOut",
+        "type": "object"
+      },
+      "DiscoveryAgentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "description": "Free-text description of how the organisation runs the process.",
+            "maxLength": 8000,
+            "minLength": 20,
+            "title": "Description",
+            "type": "string"
+          },
+          "open_session": {
+            "default": true,
+            "description": "Store the draft as a discovery session so a human can review and edit it.",
+            "title": "Open Session",
+            "type": "boolean"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
+          },
+          "template": {
+            "anyOf": [
+              {
+                "enum": [
+                  "retail",
+                  "ministry",
+                  "bank"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Force a template. Omitted, the agent picks one from the description.",
+            "title": "Template"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "DiscoveryAgentRequest",
+        "type": "object"
+      },
       "DiscoverySessionCreate": {
         "additionalProperties": false,
         "properties": {
@@ -703,6 +825,29 @@
           "type"
         ],
         "title": "QuestionOut",
+        "type": "object"
+      },
+      "RationaleOut": {
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "string"
+          },
+          "placeholder": {
+            "title": "Placeholder",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "placeholder",
+          "rationale",
+          "confidence"
+        ],
+        "title": "RationaleOut",
         "type": "object"
       },
       "ReadyOut": {
@@ -1425,7 +1570,7 @@
       "url": "https://opensource.org/licenses/MIT"
     },
     "title": "Enterprise AI Automation Templates API",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1544,6 +1689,48 @@
         "summary": "Recompute the whole hash chain",
         "tags": [
           "audit"
+        ]
+      }
+    },
+    "/discovery/agent": {
+      "post": {
+        "description": "Runs the PydanticAI discovery agent on the provider this deployment is configured with. Its answer is validated against the template's own placeholder model before it is returned: a field the template does not declare, a value of the wrong type, or a policy pack that crosses its region all fail closed with `discovery_incomplete` and the offending field. The result is a DRAFT \u2014 no organization, workflow or run is created, and no decision is made.",
+        "operationId": "discovery_agent_discovery_agent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoveryAgentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryAgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draft a questionnaire from a free-text process description",
+        "tags": [
+          "discovery"
         ]
       }
     },

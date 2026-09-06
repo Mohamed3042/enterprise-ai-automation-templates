@@ -1,0 +1,33 @@
+{
+  "_note": "Authored from https://ai.google.dev/api/generate-content; shape confirmed against a live gemini-3.6-flash answer from this machine. Content synthetic.",
+  "_request": {
+    "method": "POST",
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+    "headers": {
+      "x-goog-api-key": "<redacted>",
+      "content-type": "application/json"
+    }
+  },
+  "status": 200,
+  "body": {
+    "candidates": [
+      {
+        "finishReason": "STOP",
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "{\"summary\": \"Synthetic request classified for governed human review.\", \"recommendation\": \"REVIEW\", \"confidence\": 0.88}"
+            }
+          ]
+        }
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 1043,
+      "candidatesTokenCount": 61,
+      "thoughtsTokenCount": 1844,
+      "totalTokenCount": 2948
+    }
+  }
+}

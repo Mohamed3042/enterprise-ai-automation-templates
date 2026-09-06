@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "enterprise-ai-automation-templates"
-version = "0.2.0"
+version = "0.3.0"
 description = "Governed, discovery-led enterprise AI automation templates"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,7 +15,17 @@ dependencies = [
   "fastapi>=0.115,<1",
   "httpx>=0.27,<1",
   "jinja2>=3.1,<4",
+  # The instrumentation packages are pre-1.0 and versioned separately from the API/SDK;
+  # they are pinned exactly because a beta bump has broken instrument_app before.
+  "opentelemetry-api>=1.44,<2",
+  "opentelemetry-sdk>=1.44,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.44,<2",
+  "opentelemetry-instrumentation-fastapi==0.65b0",
+  "opentelemetry-instrumentation-httpx==0.65b0",
+  "opentelemetry-instrumentation-sqlalchemy==0.65b0",
+  "prometheus-client>=0.26,<1",
   "pydantic>=2.9,<3",
+  "pydantic-ai-slim>=2.40,<3",
   "pydantic-settings>=2.6,<3",
   "PyJWT>=2.9,<3",
   "python-multipart>=0.0.12,<1",
@@ -43,16 +53,24 @@ atmpl = "atmpl.cli:run"
 where = ["src"]
 
 [tool.setuptools.package-data]
-atmpl = ["web/static/*", "web/templates/*", "migrations/*.py", "migrations/**/*.py", "migrations/*.mako"]
+atmpl = [
+  "web/static/*",
+  "web/templates/*",
+  "migrations/*.py",
+  "migrations/**/*.py",
+  "migrations/*.mako",
+  "providers/prices.yaml",
+]
 
 [tool.pytest.ini_options]
-addopts = "-ra --basetemp=.pytest_tmp"
+addopts = "-ra --basetemp=.pytest_tmp -m \"not live\""
 testpaths = ["tests"]
 filterwarnings = [
   "ignore:Using `httpx` with `starlette.testclient` is deprecated",
 ]
 markers = [
   "e2e: browser end-to-end tests (require `playwright install chromium`)",
+  "live: calls a hosted model API (needs GEMINI_API_KEY; skipped otherwise)",
 ]
 
 [tool.ruff]

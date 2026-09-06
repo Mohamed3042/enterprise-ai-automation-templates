@@ -1,0 +1,36 @@
+{
+  "_note": "Authored from https://docs.anthropic.com/en/api/messages. Content synthetic.",
+  "_request": {
+    "method": "POST",
+    "url": "https://api.anthropic.com/v1/messages",
+    "headers": {
+      "x-api-key": "<redacted>",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json"
+    }
+  },
+  "status": 200,
+  "body": {
+    "id": "msg_synthetic_cassette_ok",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5",
+    "stop_reason": "tool_use",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_synthetic_cassette_ok",
+        "name": "emit_structured_output",
+        "input": {
+          "summary": "Synthetic request classified for governed human review.",
+          "recommendation": "REVIEW",
+          "confidence": 0.88
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 988,
+      "output_tokens": 74
+    }
+  }
+}

@@ -1,0 +1,117 @@
+# Who may move a run, and what happens to a model that says it already has.
+#
+# This is the product's whole claim, so it is the part with the most `allowed` cases: the
+# suite has to show that the authorised role *can* sign, not only that everyone else cannot.
+
+category: authority
+
+cases:
+  - id: E-AUTH-01
+    title: An unsigned HIGH decision is refused
+    probe: authority
+    args:
+      tier: HIGH
+      allowed_roles: [senior_credit_officer]
+      decision: { decision: approve }
+    expect:
+      decision: blocked
+      codes: [UNSIGNED_DECISION]
+      guardrail: G2
+
+  - id: E-AUTH-02
+    title: A role outside the matrix cannot sign a HIGH transition
+    probe: authority
+    args:
+      tier: HIGH
+      allowed_roles: [senior_credit_officer]
+      decision:
+        actor: Synthetic Intern
+        role: synthetic_intern
+        decision: approve
+        reason: Trying to approve above my band
+        signature: sig_synthetic_eval_case
+    expect:
+      decision: blocked
+      codes: [AUTHORITY_MATRIX]
+      guardrail: G4
+
+  - id: E-AUTH-03
+    title: The named senior officer can sign a HIGH transition
+    probe: authority
+    rationale: The positive control. Without it, "blocked" could just mean "broken".
+    args:
+      tier: HIGH
+      allowed_roles: [senior_credit_officer]
+      decision:
+        actor: Synthetic Senior Officer
+        role: senior_credit_officer
+        decision: approve
+        reason: Application is complete and within the officer band
+        signature: sig_synthetic_eval_case
+    expect:
+      decision: allowed
+      guardrail: G2
+
+  - id: E-AUTH-04
+    title: A signed rejection is recorded, not swallowed
+    probe: authority
+    args:
+      tier: MEDIUM
+      allowed_roles: [store_manager]
+      decision:
+        actor: Synthetic Store Manager
+        role: store_manager
+        decision: reject
+        reason: Outside the 14-day window
+        signature: sig_synthetic_eval_case
+    expect:
+      decision: allowed
+
+  - id: E-AUTH-05
+    title: A decision with no reason does not validate
+    probe: authority
+    rationale: G4 requires an attributed reason; an empty one is not an approval.
+    args:
+      tier: HIGH
+      allowed_roles: [risk_owner]
+      decision:
+        actor: Synthetic Risk Owner
+        role: risk_owner
+        decision: approve
+        reason: ""
+        signature: sig_synthetic_eval_case
+    expect:
+      decision: blocked
+      codes: [UNSIGNED_DECISION]
+
+  - id: E-AUTH-06
+    title: The kill switch parks AI execution
+    probe: kill_switch
+    args: { enabled: true }
+    expect:
+      decision: blocked
+      codes: [KILL_SWITCH_ACTIVE]
+      guardrail: G6
+
+  - id: E-AUTH-07
+    title: With the kill switch off, AI execution is permitted again
+    probe: kill_switch
+    args: { enabled: false }
+    expect:
+      decision: allowed
+
+  - id: E-AUDIT-01
+    title: A mutated ledger record fails hash-chain verification
+    probe: audit_chain
+    args: { tamper: true }
+    expect:
+      decision: blocked
+      codes: [AUDIT_CHAIN_BROKEN]
+      guardrail: G5
+
+  - id: E-AUDIT-02
+    title: An untouched ledger verifies
+    probe: audit_chain
+    args: { tamper: false }
+    expect:
+      decision: allowed

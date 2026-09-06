@@ -1,0 +1,59 @@
+# Published list prices used to ESTIMATE the cost of a model call.
+#
+# These are not billing figures. They are the vendors' public per-token list prices on the
+# date below, applied to the token counts the provider reported. Discounts, batch tiers,
+# cached-input rates, free tiers and long-context surcharges are NOT modelled, so a real
+# invoice will differ. Every cost the dashboard shows is labelled `estimated` for that
+# reason, and a model missing from this table is shown as "not priced", never as 0.
+#
+# Google publishes a step change for the Gemini 3.6/3.7/3.8 Flash family on 2027-01-01
+# (input 0.75 -> 1.50, output 3.75 -> 7.50). The rates below are the ones in force on
+# `as_of`; `valid_through` says when this file stops being right, so a stale estimate is
+# visible rather than silent.
+#
+# Units: US dollars per 1,000,000 tokens.
+
+as_of: "2026-09-06"
+valid_through: "2026-12-31"
+currency: USD
+unit: per_million_tokens
+source: "https://ai.google.dev/gemini-api/docs/pricing and the vendors' pricing pages, read 2026-09-06"
+
+models:
+  gemini/gemini-3.6-flash:
+    input: 0.75
+    output: 3.75
+  gemini/gemini-3.7-flash:
+    input: 0.75
+    output: 3.75
+  gemini/gemini-3.8-flash:
+    input: 0.75
+    output: 3.75
+  gemini/gemini-3.5-flash:
+    input: 1.50
+    output: 9.00
+  gemini/gemini-3.5-flash-lite:
+    input: 0.30
+    output: 2.50
+  gemini/gemini-3.1-flash-lite:
+    input: 0.25
+    output: 1.50
+  anthropic/claude-sonnet-5:
+    input: 3.00
+    output: 15.00
+  anthropic/claude-haiku-4-5-20251001:
+    input: 1.00
+    output: 5.00
+  anthropic/claude-opus-5:
+    input: 15.00
+    output: 75.00
+  openai/gpt-4o-mini:
+    input: 0.15
+    output: 0.60
+  openai/gpt-4o:
+    input: 2.50
+    output: 10.00
+  # The deterministic offline adapter costs nothing and says so, rather than being absent.
+  mock/deterministic-v1:
+    input: 0.0
+    output: 0.0

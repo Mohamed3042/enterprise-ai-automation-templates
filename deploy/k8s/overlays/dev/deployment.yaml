@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atmpl
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: atmpl
+          # `demo up` seeds the three synthetic demos and serves them; that is what makes
+          # the kind smoke a test of the product and not only of the manifest.
+          command: ["python", "-m", "atmpl", "demo", "up", "--host", "0.0.0.0", "--port", "8000"]
+          env:
+            - name: ATMPL_DATABASE_URL
+              value: sqlite:///var/atmpl.db
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 640Mi

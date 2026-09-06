@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "body": {
+    "id": "chatcmpl-synthetic-cassette-tool",
+    "object": "chat.completion",
+    "model": "gpt-4o-mini",
+    "choices": [
+      {
+        "index": 0,
+        "finish_reason": "tool_calls",
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_synthetic_cassette",
+              "type": "function",
+              "function": {
+                "name": "list_required_fields",
+                "arguments": "{\"template\": \"retail_refund\"}"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 402,
+      "completion_tokens": 19
+    }
+  }
+}

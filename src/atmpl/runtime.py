@@ -11,8 +11,11 @@ import time
 from dataclasses import dataclass, field
 
 from atmpl.engine.service import AutomationEngine
+from atmpl.providers.adapter import RouterAdapter
+from atmpl.providers.router import ProviderRouter
 from atmpl.secrets import SecretResolver, build_provider
 from atmpl.settings import Settings
+from atmpl.telemetry import Observability, build_observability
 
 
 class TokenBucket:
@@ -57,6 +60,8 @@ class AppContext:
     engine: AutomationEngine
     settings: Settings
     secrets: SecretResolver
+    observability: Observability
+    router: ProviderRouter
     limiter: TokenBucket = field(init=False)
 
     def __post_init__(self) -> None:
@@ -72,9 +77,27 @@ class AppContext:
         return self.secrets.get_or_ephemeral("session_signing_key")
 
 
-def build_context(engine: AutomationEngine, settings: Settings) -> AppContext:
+def build_context(
+    engine: AutomationEngine,
+    settings: Settings,
+    *,
+    observability: Observability | None = None,
+) -> AppContext:
+    """Build the one object handlers read. Also back-fills the engine's instruments.
+
+    The engine is often constructed before the settings are known (the CLI seeds a demo,
+    then serves it), so this is where its observability and provider router are attached
+    if it does not have them yet.
+    """
+    observability = observability or build_observability(settings)
+    router = ProviderRouter(settings, observability=observability)
+    if engine.observability is None:
+        engine.observability = observability
+        engine.adapter = RouterAdapter(router)
     return AppContext(
         engine=engine,
         settings=settings,
         secrets=SecretResolver(build_provider(settings)),
+        observability=observability,
+        router=router,
     )

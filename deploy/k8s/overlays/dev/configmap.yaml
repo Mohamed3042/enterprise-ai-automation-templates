@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atmpl-config
+data:
+  # SQLite creates its own schema in-process; `atmpl db upgrade` is for a real server.
+  ATMPL_AUTO_CREATE_SCHEMA: "true"
+  ATMPL_HSTS_ENABLED: "0"
+  ATMPL_DEMO_OPEN_API: "1"
+  ATMPL_TRACE_EXPORTER: "console"

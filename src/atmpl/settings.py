@@ -35,6 +35,32 @@ class Settings(BaseSettings):
         default="mock",
         validation_alias=AliasChoices("ATMPL_ADAPTER", "ATMPL_LLM_ADAPTER"),
     )
+    #: Fallback chain tried in order after ``adapter`` fails. Never chosen by a caller (G7).
+    provider_fallbacks: list[str] = Field(default_factory=list)
+    provider_timeout_seconds: float = 30.0
+    provider_max_attempts: int = 3
+    provider_backoff_seconds: float = 0.5
+    provider_breaker_threshold: int = 3
+    provider_breaker_cooldown_seconds: float = 30.0
+    gemini_model: str = "gemini-3.6-flash"
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    anthropic_model: str = "claude-sonnet-5"
+    anthropic_base_url: str = "https://api.anthropic.com/v1"
+    openai_model: str = "gpt-4o-mini"
+    openai_base_url: str = "https://api.openai.com/v1"
+
+    # --- telemetry ---------------------------------------------------------
+    #: ``none`` keeps spans in-process (the LLMOps page still works), ``console`` prints
+    #: them, ``otlp`` ships them to ``otlp_endpoint``.
+    trace_exporter: str = "none"
+    otlp_endpoint: str = "http://localhost:4318/v1/traces"
+    service_name: str = "atmpl"
+    #: How many finished spans and model calls this process keeps for the LLMOps page.
+    telemetry_buffer_size: int = 2_000
+    metrics_enabled: bool = True
+    #: ``/metrics`` without a credential. Turn off to require the ``metrics:read`` scope.
+    metrics_public: bool = True
+    json_logs: bool = False
 
     # --- secrets -----------------------------------------------------------
     secrets_backend: str = "env"
@@ -65,11 +91,25 @@ class Settings(BaseSettings):
     webhook_tolerance_seconds: int = 300
     public_base_url: str = "http://127.0.0.1:8000"
 
-    @field_validator("allowed_origins", "csp_script_src", mode="before")
+    # --- demo boundary (hosted) -------------------------------------------
+    #: The Hugging Face Space sets this: the dashboard renders read-only and every
+    #: mutation is refused, so a public demo cannot spend a key or move a run.
+    demo_readonly: bool = False
+
+    @field_validator("allowed_origins", "csp_script_src", "provider_fallbacks", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("trace_exporter")
+    @classmethod
+    def _known_exporter(cls, value: str) -> str:
+        if value not in {"none", "console", "otlp"}:
+            raise ValueError(
+                f"Unknown ATMPL_TRACE_EXPORTER '{value}'. Allowed: none, console, otlp"
+            )
         return value
 
     @field_validator("secrets_backend")
@@ -89,6 +129,15 @@ class Settings(BaseSettings):
         if self.auto_create_schema is not None:
             return self.auto_create_schema
         return self.is_sqlite
+
+    @property
+    def provider_chain(self) -> list[str]:
+        """Primary provider first, then each configured fallback, de-duplicated in order."""
+        chain: list[str] = []
+        for name in [self.adapter, *self.provider_fallbacks]:
+            if name and name not in chain:
+                chain.append(name)
+        return chain
 
     @property
     def demo_mode(self) -> bool:

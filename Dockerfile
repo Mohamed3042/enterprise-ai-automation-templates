@@ -31,9 +31,12 @@ COPY --from=builder /dist/*.whl /tmp/
 RUN python -m pip install /tmp/*.whl "psycopg[binary]==3.2.12" \
  && rm -rf /tmp/*.whl
 
-# Template artifacts and demo answers are data, not code: they live beside the app.
+# Template artifacts, demo answers and eval cases are data, not code: they live beside the
+# app. `evals/` is not optional -- without it the container runs a suite of zero cases and
+# reports a pass rate for it, which is how this line came to exist.
 COPY templates ./templates
 COPY demos ./demos
+COPY evals ./evals
 COPY alembic.ini ./alembic.ini
 
 RUN useradd --create-home --uid 10001 atmpl \

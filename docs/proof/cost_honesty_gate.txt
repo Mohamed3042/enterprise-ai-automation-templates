@@ -1,0 +1,30 @@
+GATE: an unpriced model is not priced at zero
+=============================================
+
+Recorded 2026-09-06T12:27:47+00:00 on Windows 11, Python 3.12.10, from the tree this release was cut from.
+
+WHAT WAS REMOVED
+----------------
+src/atmpl/providers/pricing.py — `estimate()` returns 0.0 instead of None when the
+committed price table does not know the model, which is the difference between
+'this cost nothing' and 'we did not compute this'.
+
+RED — with the fix removed
+--------------------------
+        prices = load_prices()
+    
+>       assert prices.estimate("gemini", "some-unlisted-model", Usage(1000, 1000)) is None
+E       assert 0.0 is None
+E        +  where 0.0 = estimate('gemini', 'some-unlisted-model', Usage(input_tokens=1000, output_tokens=1000))
+E        +    where estimate = PriceTable(as_of='2026-09-06', currency='USD', source="https://ai.google.dev/gemini-api/docs/pricing and the vendors' ...': {'input': 2.5, 'output': 10.0}, 'mock/deterministic-v1': {'input': 0.0, 'output': 0.0}}, valid_through='2026-12-31').estimate
+E        +    and   Usage(input_tokens=1000, output_tokens=1000) = Usage(1000, 1000)
+
+tests\test_providers.py:364: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_providers.py::test_an_unpriced_model_is_not_priced_at_zero
+1 failed in 0.21s
+
+GREEN — with the fix in place
+-----------------------------
+.                                                                        [100%]
+1 passed in 0.02s

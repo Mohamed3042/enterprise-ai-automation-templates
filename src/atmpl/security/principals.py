@@ -18,6 +18,7 @@ class Scope(StrEnum):
     DECISIONS_WRITE = "decisions:write"
     AUDIT_READ = "audit:read"
     WEBHOOKS_MANAGE = "webhooks:manage"
+    METRICS_READ = "metrics:read"
 
 
 ALL_SCOPES: frozenset[str] = frozenset(scope.value for scope in Scope)
