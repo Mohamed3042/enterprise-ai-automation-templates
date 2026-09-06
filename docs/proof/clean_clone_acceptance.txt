@@ -1,57 +1,49 @@
-Clean-clone acceptance — measured 2026-09-06 (Windows 11, Python 3.12.10, uv 0.11.28)
+CLEAN-CLONE ACCEPTANCE — v0.3.0
+===============================
 
-Cloned the branch into an empty directory outside the working tree, installed, and ran the
-keyless path with no environment variables, no database and no API key.
+Recorded 2026-09-06T13:33:14Z on Windows 11, Python 3.12, from a shallow clone of
+main with no ATMPL_* variables set and no API key.
 
-    $ git clone --branch feat/gaps-atmpl-api --depth 1 \
-        https://github.com/Mohamed3042/enterprise-ai-automation-templates.git clean-clone
-    $ uv venv --python 3.12 .venv && uv pip install -e ".[dev]"
-    $ python -m atmpl demo up --port 8124
+$ git clone --depth 1 https://github.com/Mohamed3042/enterprise-ai-automation-templates.git
+$ python -m venv .venv && .venv/Scripts/python -m pip install -e .
 
-    SEEDED: retail + ministry + bank (synthetic, deterministic, offline)
-    DATABASE: sqlite:///var/atmpl.db (migrations at 0001)
-    DASHBOARD: http://127.0.0.1:8124
-    API DOCS:  http://127.0.0.1:8124/api/v1/docs
-    MODE: demo mode - no login; decisions are recorded as human:demo
-    WEBHOOK IN: POST /api/v1/webhooks/helpdesk - secret whsec_...
-    WEBHOOK IN: POST /api/v1/webhooks/case_intake - secret whsec_...
-    INFO:     Uvicorn running on http://127.0.0.1:8124 (Press CTRL+C to quit)
+$ python -m atmpl providers check
+PRICE TABLE: as of 2026-09-06 (estimates only, not billing)
+primary  mock       deterministic-v1         configured               breaker=closed priced
+(add --ping to make one real call to each configured provider)
 
-Measured against that live server:
+$ python -m atmpl evals run
+EVALS: mock (deterministic-v1) - 61 case(s)
+  authority          9/9 pass  fail=0 error=0 skipped=0
+  data_protection    5/5 pass  fail=0 error=0 skipped=0
+  output_integrity   7/7 pass  fail=0 error=0 skipped=0
+  prompt_injection   7/7 pass  fail=0 error=0 skipped=0
+  redteam            24/24 pass  fail=0 error=0 skipped=0
+  typed_output       9/9 pass  fail=0 error=0 skipped=0
+PASS RATE: 1.000 (61/61 scored, 0 skipped)
+GATED PASS RATE: 1.000
 
-    GET  /api/v1/health   -> {"status":"ok","version":"0.2.0","adapter":"mock"}
-    GET  /                -> HTTP 200, 9311 bytes, contains "HIGH risk is human-decided"
-    GET  /redteam         -> contains "24 / 24 attacks blocked"
-    POST /api/v1/audit/verify
-                          -> {"valid":true,"count":25,
-                              "last_hash":"836d6339523bbf886759d16669a307c9e5a7826ad49a398620ac1fe1244d0bbb"}
+$ python -m atmpl evals gate --min-pass 1.0
+GATE PASS: gated pass rate 1.000 >= required 1.000 (a fresh run)
 
-CLI, same clean clone:
+$ python -m atmpl redteam | tail -1
+REDTEAM: 24/24 BLOCKED
 
-    $ python -m atmpl keys create --name acme-erp --scopes runs:read,decisions:write
-    API KEY CREATED (shown once - store it now):
-      name:   acme-erp
-      scopes: decisions:write, runs:read
-      key:    atmpl_cfe05f64_...            (throwaway key, this database was discarded)
+$ python -m atmpl audit verify --path var/audit.jsonl
+AUDIT VERIFIED: 31 records - last hash 2e3d0a48fd1021ce217ffdaeb5bace8b0d79fa4731d50ceb334b1f5ce0828ef9
 
-    $ python -m atmpl doctor
-    database        sqlite:///var/atmpl.db
-    tables          14
-    migrations      0001
-    adapter         mock
-    secrets backend env
-    jwt key         EPHEMERAL (restarts invalidate tokens)
-    session key     EPHEMERAL (restarts invalidate sessions)
-    dashboard       DEMO MODE (no login)
-    api             credential required
-    rate limit      120/minute
-    cors origins    none (same-origin only)
-    webhook worker  off (run: atmpl webhooks deliver)
+$ python -m atmpl demo up --exercise --port 18177   (first eight lines)
+SEEDED: retail + ministry + bank (synthetic, deterministic, offline)
+EXERCISED: classify_refund -> draft_ready (run_75bd6efa7e96)
+EXERCISED: enrich_lesson -> draft_ready (run_531fe6818d32)
+EXERCISED: loan_extract -> draft_ready (run_4b93100e14a9)
+MODEL CALLS AT START-UP: 3 on the mock provider
+DATABASE: sqlite:///var/atmpl.db (migrations at 0001)
+DASHBOARD: http://127.0.0.1:18177
+API DOCS:  http://127.0.0.1:18177/api/v1/docs
 
-    $ python -m atmpl redteam
-    REDTEAM: 24/24 BLOCKED
-
-The container path was measured separately: `docker compose --profile receiver up` on
-Docker Desktop 29.6.1 reached `Up (healthy)` for api, db and receiver, ran migrations to
-revision 0001 on PostgreSQL 16, accepted a signed inbound webhook, and delivered four signed
-events that the independent receiver verified with the recipe in docs/webhooks.md.
+$ for p in / /llmops /evals /metrics; do curl -o /dev/null -w '%{http_code}' 127.0.0.1:18177$p; done
+/          200
+/llmops    200
+/evals     200
+/metrics   200
